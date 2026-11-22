@@ -95,13 +95,13 @@ Errors use PocketBase's standard error shape (`{ status, message, data }`). Publ
 
 ### Rate limiting
 
-The module does not implement a per-IP limiter. Rate limiting the public routes is **required** for a production deployment, not optional: `login/*` creates a database row per call and `recovery/redeem` runs Argon2id. The docs give recommended PocketBase rate limit rules for `{prefix}/*` (e.g. 10 requests/min per IP for `login/*`, `recovery/*`, `enrollment/*`), and the module logs a startup warning when none is configured. **[Assumption]** PocketBase's built-in limiter can target custom route paths by prefix, and its settings can be read at startup; to verify.
+The module does not implement a per-IP limiter. Rate limiting the public routes is **required** for a production deployment, not optional: `login/*` creates a database row per call and `recovery/redeem` runs Argon2id. The docs give recommended PocketBase rate limit rules for `{prefix}/*` (e.g. 10 requests/min per IP for `login/*`, `recovery/*`, `enrollment/*`), and the module logs a startup warning when rate limiting is off or no rule covers the prefix. PocketBase rule labels match an exact path or a path prefix ending in `/` (for example `POST /api/passkeys/users/login/`); there are no wildcards inside a path, so finer rules are written per collection. Limits are counted per client IP as PocketBase sees it, so trusted proxy headers must be configured correctly behind a reverse proxy.
 
 Independent of per-IP limits, two global caps protect the server from distributed floods: `MaxPendingChallenges` and `RecoveryCodes.MaxConcurrentHashes`.
 
 ### Step-up
 
-Sensitive actions require a fresh passkey assertion: generating recovery codes always, adding a credential when one already exists if `StepUp.ForNewCredential` is on (default), and deleting a credential if `StepUp.ForCredentialDelete` is `AnyCredential` or `OtherCredential`. With `OtherCredential`, the assertion must come from a credential other than the one being deleted. The client calls `step-up/options` and `step-up/verify` with the user's token and passes the resulting one-time `stepUpToken` in the body of the sensitive request. The step-up assertion must come from a credential of the same signed-in user. **[Assumption]** PocketBase JWTs carry no issued-at claim usable for "recent login" checks, so the module cannot rely on token age.
+Sensitive actions require a fresh passkey assertion: generating recovery codes always, adding a credential when one already exists if `StepUp.ForNewCredential` is on (default), and deleting a credential if `StepUp.ForCredentialDelete` is `AnyCredential` or `OtherCredential`. With `OtherCredential`, the assertion must come from a credential other than the one being deleted. The client calls `step-up/options` and `step-up/verify` with the user's token and passes the resulting one-time `stepUpToken` in the body of the sensitive request. The step-up assertion must come from a credential of the same signed-in user. PocketBase JWTs carry only `exp`, no issued-at claim, so the module cannot use token age for "recent login" checks.
 
 ## 3. Go API
 
@@ -128,7 +128,7 @@ passkeys.CredentialKind(credRecord)     // "synced" | "device" | "security_key" 
 
 ## 4. Hooks
 
-All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/hook`. Handlers must call `e.Next()`; returning an error aborts the operation and the client gets a generic error.
+All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/hook`. Handlers must call `e.Next()`; returning an error aborts the operation and the client gets a generic error. PocketBase writes the error message and data of failed requests to its request log, so errors returned from hooks and handlers must never contain a secret.
 
 | Hook | When | Typical use |
 |---|---|---|

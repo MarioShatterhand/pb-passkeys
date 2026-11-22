@@ -54,7 +54,7 @@ npx playwright test --trace off                                  # E2E (Chromium
 
 ## Testing approach
 
-- Go integration tests start a real PocketBase app in-process (`tests.NewTestApp` or equivalent in the pinned version, to verify) with a temporary data directory and exercise the HTTP routes.
+- Go integration tests start a real PocketBase app in-process (`tests.NewTestApp`) with a temporary data directory and exercise the HTTP routes.
 - `internal/testauthn` generates real WebAuthn responses, so tests cover actual signature verification, not mocks.
 - E2E uses Chromium's CDP `WebAuthn.addVirtualAuthenticator`, with both resident-key/UV and non-UV authenticators.
 - Each failing test re-run: only the failing tests while fixing; the full suite before pushing.

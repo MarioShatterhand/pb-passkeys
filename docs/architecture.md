@@ -49,8 +49,8 @@ The Go module lives at the repository root so the import path stays short. The T
 ### Integration with PocketBase
 
 - Routes are registered in `app.OnServe().BindFunc(...)` on `se.Router`, the documented way to add custom routes.
-- Collections are created by Go migrations shipped with the module and applied automatically (`migratecmd` is not required). **[Assumption]** Migrations registered by a library through `core.AppMigrations` run together with the app's own migrations; to verify, including ordering.
-- Successful login returns `apis.RecordAuthResponse(e, record, "passkey", meta)`, so PocketBase's `OnRecordAuthRequest` hooks, `_authOrigins` tracking and new-login alerts behave as for built-in methods. **[Assumption]** Exact function name and MFA interplay to verify in the pinned version.
+- Collections are created by a Go migration shipped with the module and registered in `core.AppMigrations` under an explicit, unique file name; PocketBase applies it automatically at `serve` (`migratecmd` is not required). App migrations run in file-name order, so the module's migration does not depend on any application collection. It uses the names from `Config.Collections` at the time it first runs.
+- Successful login returns `apis.RecordAuthResponse(e, record, "passkey", meta)`, so PocketBase's `OnRecordAuthRequest` hooks, the collection's `AuthRule`, `_authOrigins` tracking and new-login alerts behave as for built-in methods. If the collection has MFA enabled, PocketBase asks for a second, different method after a passkey login; see [open-questions.md](open-questions.md) (decision 6).
 - Hook types reuse `github.com/pocketbase/pocketbase/tools/hook`, so the API feels native.
 
 ## 4. Data model
@@ -100,7 +100,7 @@ Server-side ceremony state:
 | `recordRef` | Set for registration and step-up; empty for discoverable login |
 | `enrollmentRef` | Set when registration was started with an enrollment token |
 | `sessionData` | json, hidden |
-| `expiresAt` | Default 5 min |
+| `expiresAt` | Default 5 min (`ChallengeTTL`); also written to go-webauthn's `SessionData.Expires`, which would otherwise follow the shorter browser `Timeout` |
 
 A challenge is consumed atomically (read and delete in one transaction) on first use, success or failure. No API access. Because `login/options` is public, the number of unexpired challenges is capped (`Config.MaxPendingChallenges`); above the cap, new public ceremonies are refused with 429 until cleanup or expiry frees space.
 
@@ -187,7 +187,7 @@ With `StepUp.ForCredentialDelete: Off` (default), users delete their credentials
 
 ## 6. Passwordless mode
 
-`Config.Passwordless` has three values. `PasswordlessOff` (default) does no checks. `PasswordlessEnforce` checks at startup that password auth and OTP are disabled on the configured collections and refuses to start otherwise. `PasswordlessWarn` runs the same checks but only logs a warning. The module never changes collection settings silently. **[Assumption]** PocketBase auth records always carry a `password` field; invited users are created with a random 32-byte password that nobody knows. To verify that this is the cleanest option in the pinned version.
+`Config.Passwordless` has three values. `PasswordlessOff` (default) does no checks. `PasswordlessEnforce` checks at startup that password auth and OTP are disabled on the configured collections and refuses to start otherwise. `PasswordlessWarn` runs the same checks but only logs a warning. The module never changes collection settings silently. PocketBase auth records always carry a `password` field; users without a password are created with `Record.SetRandomPassword()`, the same call PocketBase uses for users created through OTP or OAuth2.
 
 ## 7. Non-goals for 1.0
 
