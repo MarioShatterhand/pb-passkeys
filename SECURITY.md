@@ -13,7 +13,7 @@ Until 1.0, only the latest minor release receives security fixes. The previous m
 
 **Do not open a public issue, discussion or pull request.**
 
-Use GitHub's private vulnerability reporting: the **Security** tab of this repository → **Report a vulnerability**. [Maintainer: enable it under Settings → Code security → Private vulnerability reporting.]
+Use GitHub's private vulnerability reporting: the **Security** tab of this repository → **Report a vulnerability**.
 
 Please include:
 - affected version(s) and configuration,
