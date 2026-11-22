@@ -49,8 +49,8 @@ The Go module lives at the repository root so the import path stays short. The T
 ### Integration with PocketBase
 
 - Routes are registered in `app.OnServe().BindFunc(...)` on `se.Router`, the documented way to add custom routes.
-- Collections are created by a Go migration shipped with the module and registered in `core.AppMigrations` under an explicit, unique file name; PocketBase applies it automatically at `serve` (`migratecmd` is not required). App migrations run in file-name order, so the module's migration does not depend on any application collection. It uses the names from `Config.Collections` at the time it first runs.
-- Successful login returns `apis.RecordAuthResponse(e, record, "passkey", meta)`, so PocketBase's `OnRecordAuthRequest` hooks, the collection's `AuthRule`, `_authOrigins` tracking and new-login alerts behave as for built-in methods. If the collection has MFA enabled, PocketBase asks for a second, different method after a passkey login; see [open-questions.md](open-questions.md) (decision 6).
+- Collections are created by a Go migration shipped with the module and registered in `core.AppMigrations` under an explicit, unique file name; PocketBase applies it automatically at `serve` (`migratecmd` is not required). App migrations run in file-name order, so the module's migration does not depend on any application collection. It uses the names from `Config.Collections` at the time it first runs. The names are fixed from then on: the module never renames its collections, and startup fails if a configured collection is missing.
+- Successful login returns `apis.RecordAuthResponse(e, record, "passkey", meta)`, so PocketBase's `OnRecordAuthRequest` hooks, the collection's `AuthRule`, `_authOrigins` tracking and new-login alerts behave as for built-in methods. If the collection has MFA enabled, PocketBase asks for a second, different method after a passkey login. The module does not change that; because a passkey with user verification is already two factors, MFA should be off for collections that use passkeys.
 - Hook types reuse `github.com/pocketbase/pocketbase/tools/hook`, so the API feels native.
 
 ## 4. Data model

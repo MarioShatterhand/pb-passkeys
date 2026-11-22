@@ -54,7 +54,7 @@ pk := passkeys.MustRegister(app, passkeys.Config{
 
 	// Routing and storage
 	RoutePrefix: "/api/passkeys",                 // routes: {prefix}/{collection}/...
-	Collections: passkeys.CollectionNames{},   // zero value = defaults from architecture.md
+	Collections: passkeys.CollectionNames{},   // zero value = defaults from architecture.md; fixed after the first start
 })
 ```
 
@@ -63,7 +63,10 @@ Startup validation fails (returns an error from `Register`, panics in `MustRegis
 - `RPID` is empty, has a scheme, or is not a suffix of every `https` origin host;
 - an origin uses `http` on anything other than `localhost`/`127.0.0.1`;
 - a configured collection does not exist, is not an auth collection, or is `_superusers`;
-- `Passwordless: Enforce` and password or OTP auth is enabled on a configured collection.
+- `Passwordless: Enforce` and password or OTP auth is enabled on a configured collection;
+- one of the module's own collections (`Collections`) is missing after migrations ran, which happens when the names were changed after the first start.
+
+It logs a warning, without failing, when a configured auth collection has PocketBase MFA enabled: a passkey login would then require a second method.
 
 A helper `passkeys.ConfigFromEnv(prefix string)` may be added for people who prefer environment variables (`PB_PASSKEYS_RP_ID`, `PB_PASSKEYS_RP_ORIGINS`, ...). Not in v0.1.
 
