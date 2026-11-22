@@ -26,8 +26,8 @@ As of 2026-11-22 the Go module proxy lists PocketBase **v0.40.6** (2026-10-23) a
 
 | Version | Scope |
 |---|---|
-| **0.1** | Config validation, collections + migrations, registration and discoverable login, many credentials per user, list/rename/delete via collection API, standard auth response, Go tests with a software authenticator |
-| **0.2** | Recovery codes, enrollment tokens (invite, admin reset, recovery), step-up, all hooks, cleanup job, passwordless `Warn`/`Enforce` |
+| **0.1** | Config validation, collections + migrations, registration and discoverable login, many credentials per user, list/rename/delete via collection API, stored authenticator hints and `CredentialKind`, standard auth response, Go tests with a software authenticator |
+| **0.2** | Recovery codes, enrollment tokens (invite, admin reset, recovery, optional binding to the first device), step-up (including `ForCredentialDelete`), all hooks, cleanup job, passwordless `Warn`/`Enforce` |
 | **0.3** | TypeScript client, `examples/minimal`, Playwright E2E with Chromium's virtual authenticator, conditional UI (autofill) |
 | **0.4** | Android origins (`android:apk-key-hash`) documented and tested, AAGUID → authenticator name lookup (optional, embedded list), prebuilt "PocketBase + pocketauthn" binaries via GoReleaser |
 | **0.5** | Fuzzing, docs site, migration guide from other PocketBase passkey add-ons |

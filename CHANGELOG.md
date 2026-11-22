@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - Design documents: architecture, API, threat model, versioning, open questions.
 - Design: step-up ceremony routes and `passkey_step_ups` collection; recovery codes with selector + verifier (one Argon2id check per redeem); global caps `MaxPendingChallenges` and `RecoveryCodes.MaxConcurrentHashes`; `OnSignCountAnomaly` hook.
+- Design: optional step-up for deleting a credential (`StepUp.ForCredentialDelete`: `Off` / `AnyCredential` / `OtherCredential`) with a `credentials/delete` route.
+- Design: optional binding of an enrollment token to the first browser that uses it (`bindToFirstDevice`) and the `OnEnrollmentBindingMismatch` hook.
+- Design: `authenticatorAttachment` stored with each credential; `CredentialKind` helper (`synced` / `device` / `security_key` / `unknown`) for display.
 
 ### Changed
 - Design: enrollment status moved from `GET .../enrollment/{token}` to `POST .../enrollment/status`; secrets are never sent in URLs.

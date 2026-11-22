@@ -66,14 +66,28 @@ All collection names are configurable (`Config.Collections`). Defaults below. Ev
 | `publicKey` | text, hidden | COSE key, base64url |
 | `signCount` | number | Stored, see security.md for policy |
 | `aaguid` | text | Authenticator model, optional display name lookup |
-| `transports` | json | Hints for later logins |
+| `transports` | json | Hints for later logins, e.g. `internal`, `hybrid`, `usb`, `nfc` |
+| `authenticatorAttachment` | text | `platform`, `cross-platform` or empty, as reported by the browser at registration |
 | `backupEligible`, `backupState` | bool | Synced ("passkey") vs device-bound |
 | `attestationFormat` | text | `none` by default |
 | `name` | text, max 64 | User-chosen label |
 | `lastUsedAt` | date | |
 | `created`, `updated` | autodate | |
 
-Default rules: list/view `recordRef = @request.auth.id && collectionRef = @request.auth.collectionId`; update the same, with only `name` writable (enforced in a hook, not only in rules); delete the same, guarded by the "last credential" policy; create `null` (only through the ceremony). The "last credential" check and the delete run in the same transaction, so two parallel deletes cannot remove the last two credentials.
+Default rules: list/view `recordRef = @request.auth.id && collectionRef = @request.auth.collectionId`; update the same, with only `name` writable (enforced in a hook, not only in rules); delete the same, guarded by the "last credential" policy; create `null` (only through the ceremony). The "last credential" check and the delete run in the same transaction, so two parallel deletes cannot remove the last two credentials. When `StepUp.ForCredentialDelete` is not `Off`, the delete rule is `null` and deletion goes only through the module route (5.6).
+
+#### Authenticator type
+
+So that users can see which kind of authenticator each passkey lives on (and that their passkeys are independent of each other), the module stores what the browser and authenticator report and nothing more: `aaguid`, `transports`, `authenticatorAttachment`, `backupEligible`, `backupState`. It derives a coarse `kind`, exposed as a helper in Go (`pocketauthn.CredentialKind(record)`) and in the client (`credentialKind(record)`), not as a stored field:
+
+| `kind` | Rule (first match) |
+|---|---|
+| `synced` | `backupEligible = true` (copied between devices by a passkey provider) |
+| `security_key` | `authenticatorAttachment = cross-platform`, or `transports` contains `usb`/`nfc`/`ble` without `internal` |
+| `device` | `authenticatorAttachment = platform`, or `transports` contains `internal` |
+| `unknown` | anything else |
+
+Display names for known models (from the AAGUID) come in 0.4. These values are **unsigned hints** with `none` attestation: `authenticatorAttachment` and `transports` come from the client, and some platforms send an all-zero AAGUID. They are for display only and are never used in a security decision.
 
 ### `passkey_challenges`
 
@@ -92,7 +106,7 @@ A challenge is consumed atomically (read and delete in one transaction) on first
 
 ### `passkey_step_ups`
 
-`collectionRef`, `recordRef`, `tokenHash` (SHA-256 of a 256-bit random token), `expiresAt` (default 5 min). Created by a successful step-up assertion, deleted on first use. No API access.
+`collectionRef`, `recordRef`, `credentialRef` (the credential that produced the assertion), `tokenHash` (SHA-256 of a 256-bit random token), `expiresAt` (default 5 min). Created by a successful step-up assertion, deleted on first use. No API access.
 
 ### `passkey_recovery_codes`
 
@@ -112,6 +126,8 @@ A code has two parts: a short random **selector** used only to find the row, and
 | `revokeExisting` | On success: delete all credentials and recovery codes and rotate the user's `tokenKey` |
 | `createdBy` | Optional reference for audit |
 | `consumedAt` | Set on success; the row is kept for audit until cleanup |
+| `bindToFirstDevice` | If true, the token works only in the browser that first used it (see 5.3) |
+| `bindingHash`, `boundAt` | SHA-256 of the binding secret and the time of binding; empty until the first use |
 | `meta` | json, hidden; application data for hooks (e.g. a hash of a phone code) |
 
 No API access. Applications create enrollments through the Go API (`pa.IssueEnrollment`) from their own routes or admin tooling.
@@ -140,8 +156,14 @@ Non-discoverable login with an `identity` is not part of v0.x, see [open-questio
 ### 5.3 Enrollment token (invitation, admin reset, recovery)
 
 1. The application calls `pa.IssueEnrollment(...)` and delivers the token however it wants. Links should carry the token in the URL **fragment** (`https://example.com/enroll#token=...`): fragments are not sent to servers, so the token does not end up in access logs, PocketBase request logs or `Referer` headers. The token is never part of a request path or query string.
-2. `POST .../enrollment/status` with `{ token }` returns only non-sensitive status (valid/expired, purpose). **Opening a link never consumes it**, so messenger link previews do not burn tokens.
+2. `POST .../enrollment/status` with `{ token }` returns only non-sensitive status (valid/expired, purpose). **Opening a link never consumes it**, so messenger link previews do not burn tokens. Link previews also never see the token, because it sits in the fragment and they do not run the page's script.
 3. `POST .../register/options` with `enrollmentToken` and optional `extra` data (e.g. `{ "phoneCode": "123456" }`). `OnEnrollmentVerify` runs: the app checks its own factors. A returned error increments `attempts`. On success the new challenge is bound to the enrollment (`enrollmentRef`).
+
+**Binding to the first device** (`bindToFirstDevice`, per token, default from `Config.Enrollment.BindToFirstDevice`). It limits a token that was forwarded or intercepted (A5) to the browser that opened it first:
+
+- The first `enrollment/status` or `register/options` call with a valid, unbound token binds it. The module generates a 256-bit binding secret, stores its SHA-256 in `bindingHash`, sets `boundAt`, and returns the secret once in the response. The client keeps it in `sessionStorage`.
+- Every later call with that token must also send `bindingSecret`. A missing or wrong secret gets the generic error, does **not** count towards `attempts`, and fires `OnEnrollmentBindingMismatch` with allow-listed request data (time, IP, user agent). The application can show these attempts to an administrator or revoke the token with `pa.RevokeEnrollment`.
+- If the legitimate user loses the binding (other browser, closed tab), they need a new token. Binding is one-way: the module never re-binds a token.
 4. `POST .../register/verify`. In one transaction: consume the challenge, re-check that the bound enrollment is still unconsumed, unexpired and unrevoked, optionally revoke existing credentials, codes and sessions, store the new credential, mark the token consumed, fire `OnEnrollmentCompleted`. If two registrations were started with the same token, only the first to finish succeeds. The response is a normal auth response, issued after any `tokenKey` rotation, so the user is signed in.
 
 ### 5.4 Recovery code
@@ -154,7 +176,14 @@ On success the code is marked used and the module returns a short-lived enrollme
 
 1. `POST .../step-up/options` with the user's PocketBase token. Creates a `step_up` challenge bound to that user, with `allowCredentials` set to the user's credentials.
 2. `navigator.credentials.get()`.
-3. `POST .../step-up/verify` with the user's token. The assertion must come from a credential owned by the **same** signed-in user; an assertion from another account is rejected even if valid. On success the module returns a one-time `stepUpToken` (stored hashed in `passkey_step_ups`, default TTL 5 min).
+3. `POST .../step-up/verify` with the user's token. The assertion must come from a credential owned by the **same** signed-in user; an assertion from another account is rejected even if valid. On success the module returns a one-time `stepUpToken` (stored hashed in `passkey_step_ups` together with the credential that signed, default TTL 5 min).
+
+### 5.6 Deleting a credential
+
+With `StepUp.ForCredentialDelete: Off` (default), users delete their credentials through the collection API, as in section 4. With `AnyCredential` or `OtherCredential`, the collection delete rule is `null` and the only way is:
+
+1. Step-up (5.5). With `OtherCredential`, the client asks for an assertion from a credential other than the one being deleted (`allowCredentials` excludes it). This proves the user still has another working passkey before one is removed.
+2. `POST .../credentials/delete` with the user's token and `{ id, stepUpToken }`. In one transaction: consume the step-up token, check that it belongs to the same user and, with `OtherCredential`, that `credentialRef` differs from `id`, apply the "last credential" policy, delete, fire `OnCredentialDeleted`.
 
 ## 6. Passwordless mode
 

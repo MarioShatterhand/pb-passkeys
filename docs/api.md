@@ -28,6 +28,7 @@ pa := pocketauthn.MustRegister(app, pocketauthn.Config{
 	StepUp: pocketauthn.StepUpConfig{
 		TTL:              5 * time.Minute,         // lifetime of a stepUpToken
 		ForNewCredential: true,                    // require step-up to add a credential when one already exists
+		ForCredentialDelete: pocketauthn.StepUpDeleteOff, // Off (default) | AnyCredential | OtherCredential
 	},
 
 	// Credentials
@@ -45,6 +46,7 @@ pa := pocketauthn.MustRegister(app, pocketauthn.Config{
 	Enrollment: pocketauthn.EnrollmentConfig{
 		DefaultTTL:         24 * time.Hour,
 		DefaultMaxAttempts: 3,
+		BindToFirstDevice:  false,                 // default for tokens that do not set it; see architecture.md 5.3
 	},
 
 	// Mode
@@ -69,11 +71,11 @@ A helper `pocketauthn.ConfigFromEnv(prefix string)` may be added for people who 
 
 All bodies are JSON. WebAuthn binary fields use base64url (WebAuthn L3 JSON serialization). `{c}` is the auth collection name or ID.
 
-Secrets (enrollment tokens, step-up tokens, recovery codes) are only ever sent in JSON bodies, never in a path or query string, because URLs are written to PocketBase request logs and proxy access logs.
+Secrets (enrollment tokens, binding secrets, step-up tokens, recovery codes) are only ever sent in JSON bodies, never in a path or query string, because URLs are written to PocketBase request logs and proxy access logs.
 
 | Method & path | Auth | Purpose |
 |---|---|---|
-| `POST {prefix}/{c}/register/options` | user token (+ `stepUpToken`, see below) **or** `enrollmentToken` | Start registration |
+| `POST {prefix}/{c}/register/options` | user token (+ `stepUpToken`, see below) **or** `enrollmentToken` (+ `bindingSecret` when the token is bound) | Start registration; may return `bindingSecret` (first use of a token with `bindToFirstDevice`) |
 | `POST {prefix}/{c}/register/verify` | same as above | Finish registration; returns the credential, or an auth response when an enrollment token was used |
 | `POST {prefix}/{c}/login/options` | public | Start a discoverable login |
 | `POST {prefix}/{c}/login/verify` | public | Finish login; returns the **standard PocketBase auth response** |
@@ -82,9 +84,10 @@ Secrets (enrollment tokens, step-up tokens, recovery codes) are only ever sent i
 | `POST {prefix}/{c}/recovery-codes` | user token + `stepUpToken` | Generate a new set; plaintext codes returned **once**; old codes deleted |
 | `GET  {prefix}/{c}/recovery-codes/status` | user token | `{ total, remaining }` only |
 | `POST {prefix}/{c}/recovery/redeem` | public | `{ identity, code }` → `{ enrollmentToken, expiresAt }` |
-| `POST {prefix}/{c}/enrollment/status` | public | `{ token }` → `{ valid, purpose, expiresAt }`; never consumes |
+| `POST {prefix}/{c}/enrollment/status` | public | `{ token, bindingSecret? }` → `{ valid, purpose, expiresAt, bindingSecret? }`; never consumes; `bindingSecret` is returned only when this call binds the token |
+| `POST {prefix}/{c}/credentials/delete` | user token + `stepUpToken` | `{ id, stepUpToken }`; only when `StepUp.ForCredentialDelete` is not `Off` |
 
-Listing, renaming and deleting credentials use the normal collection API on `passkey_credentials` (`pb.collection("passkey_credentials").getFullList()`), governed by the default rules in architecture.md.
+Listing and renaming credentials use the normal collection API on `passkey_credentials` (`pb.collection("passkey_credentials").getFullList()`), governed by the default rules in architecture.md. Deleting does too, unless `StepUp.ForCredentialDelete` is on, in which case the collection delete rule is `null` and `credentials/delete` is the only way.
 
 ### Error responses
 
@@ -98,7 +101,7 @@ Independent of per-IP limits, two global caps protect the server from distribute
 
 ### Step-up
 
-Sensitive actions require a fresh passkey assertion: generating recovery codes always, and adding a credential when one already exists if `StepUp.ForNewCredential` is on (default). The client calls `step-up/options` and `step-up/verify` with the user's token and passes the resulting one-time `stepUpToken` in the body of the sensitive request. The step-up assertion must come from a credential of the same signed-in user. **[Assumption]** PocketBase JWTs carry no issued-at claim usable for "recent login" checks, so the module cannot rely on token age.
+Sensitive actions require a fresh passkey assertion: generating recovery codes always, adding a credential when one already exists if `StepUp.ForNewCredential` is on (default), and deleting a credential if `StepUp.ForCredentialDelete` is `AnyCredential` or `OtherCredential`. With `OtherCredential`, the assertion must come from a credential other than the one being deleted. The client calls `step-up/options` and `step-up/verify` with the user's token and passes the resulting one-time `stepUpToken` in the body of the sensitive request. The step-up assertion must come from a credential of the same signed-in user. **[Assumption]** PocketBase JWTs carry no issued-at claim usable for "recent login" checks, so the module cannot rely on token age.
 
 ## 3. Go API
 
@@ -111,6 +114,7 @@ tok, err := pa.IssueEnrollment(ctx, pocketauthn.EnrollmentRequest{
 	MaxAttempts:    3,
 	RevokeExisting: true,                // delete old credentials + codes, rotate tokenKey
 	CreatedBy:      adminRecord.Id,
+	BindToFirstDevice: pocketauthn.Bool(true), // nil = Config.Enrollment.BindToFirstDevice
 	Meta:           map[string]any{"phoneCodeHash": h},
 })
 // tok.Token is plaintext, returned only here. tok.ExpiresAt, tok.Id.
@@ -118,6 +122,8 @@ tok, err := pa.IssueEnrollment(ctx, pocketauthn.EnrollmentRequest{
 pa.RevokeEnrollment(ctx, id)
 pa.RevokeAllCredentials(ctx, userRecord)   // also deletes codes, rotates tokenKey
 pa.ListCredentials(ctx, userRecord)
+
+pocketauthn.CredentialKind(credRecord)     // "synced" | "device" | "security_key" | "unknown"; display only
 ```
 
 ## 4. Hooks
@@ -135,7 +141,8 @@ All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/
 | `OnRecoveryCodesGenerated` | After a new set is created | Notify the user |
 | `OnRecoveryCodeRedeemed` | After a code is used | Notify the user, alert when few remain |
 | `OnEnrollmentVerify` | Before an enrollment token is accepted; `e.Extra` holds client data | Check a phone code from `e.Enrollment.Meta` |
-| `OnEnrollmentCompleted` | After successful enrollment (in transaction) | Notify family/admin, audit |
+| `OnEnrollmentBindingMismatch` | A bound token was used without its binding secret; `e.Request` holds allow-listed request data | Show the attempt to an administrator, revoke the token |
+| `OnEnrollmentCompleted` | After successful enrollment (in transaction) | Notify the user or an administrator, audit |
 
 Example of an application-specific factor, which stays in the application:
 
@@ -168,7 +175,11 @@ const codes = await pk.generateRecoveryCodes(); // runs step-up first
 const status = await pk.enrollmentStatus(enrollmentToken); // token read from location.hash
 const { enrollmentToken } = await pk.redeemRecoveryCode(identity, code);
 await pk.enroll(enrollmentToken, { name: "New phone", extra: { phoneCode } });
+await pk.deleteCredential(id);                  // runs step-up first when the server requires it
+credentialKind(record);                         // same rules as the Go helper; display only
 ```
+
+The client stores a `bindingSecret` it receives in `sessionStorage` (keyed by a hash of the token) and sends it automatically on later `enrollmentStatus` and `enroll` calls for the same token.
 
 ## 6. Example application (`examples/minimal`)
 
