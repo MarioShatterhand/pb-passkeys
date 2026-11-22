@@ -30,7 +30,7 @@ Rule of thumb for contributors: if a feature needs to know *why* a user is enrol
 
 ```
 your main.go
-  └── pocketauthn.MustRegister(app, cfg)
+  └── passkeys.MustRegister(app, cfg)
         ├── config     validation at startup, fails fast on unsafe values      (root package)
         ├── hooks      typed hook.Hook[*Event] values, PocketBase style         (root package)
         ├── store      collections + migrations (credentials, challenges,       internal/store
@@ -78,7 +78,7 @@ Default rules: list/view `recordRef = @request.auth.id && collectionRef = @reque
 
 #### Authenticator type
 
-So that users can see which kind of authenticator each passkey lives on (and that their passkeys are independent of each other), the module stores what the browser and authenticator report and nothing more: `aaguid`, `transports`, `authenticatorAttachment`, `backupEligible`, `backupState`. It derives a coarse `kind`, exposed as a helper in Go (`pocketauthn.CredentialKind(record)`) and in the client (`credentialKind(record)`), not as a stored field:
+So that users can see which kind of authenticator each passkey lives on (and that their passkeys are independent of each other), the module stores what the browser and authenticator report and nothing more: `aaguid`, `transports`, `authenticatorAttachment`, `backupEligible`, `backupState`. It derives a coarse `kind`, exposed as a helper in Go (`passkeys.CredentialKind(record)`) and in the client (`credentialKind(record)`), not as a stored field:
 
 | `kind` | Rule (first match) |
 |---|---|
@@ -130,7 +130,7 @@ A code has two parts: a short random **selector** used only to find the row, and
 | `bindingHash`, `boundAt` | SHA-256 of the binding secret and the time of binding; empty until the first use |
 | `meta` | json, hidden; application data for hooks (e.g. a hash of a phone code) |
 
-No API access. Applications create enrollments through the Go API (`pa.IssueEnrollment`) from their own routes or admin tooling.
+No API access. Applications create enrollments through the Go API (`pk.IssueEnrollment`) from their own routes or admin tooling.
 
 ## 5. Flows
 
@@ -155,14 +155,14 @@ Non-discoverable login with an `identity` is not part of v0.x, see [open-questio
 
 ### 5.3 Enrollment token (invitation, admin reset, recovery)
 
-1. The application calls `pa.IssueEnrollment(...)` and delivers the token however it wants. Links should carry the token in the URL **fragment** (`https://example.com/enroll#token=...`): fragments are not sent to servers, so the token does not end up in access logs, PocketBase request logs or `Referer` headers. The token is never part of a request path or query string.
+1. The application calls `pk.IssueEnrollment(...)` and delivers the token however it wants. Links should carry the token in the URL **fragment** (`https://example.com/enroll#token=...`): fragments are not sent to servers, so the token does not end up in access logs, PocketBase request logs or `Referer` headers. The token is never part of a request path or query string.
 2. `POST .../enrollment/status` with `{ token }` returns only non-sensitive status (valid/expired, purpose). **Opening a link never consumes it**, so messenger link previews do not burn tokens. Link previews also never see the token, because it sits in the fragment and they do not run the page's script.
 3. `POST .../register/options` with `enrollmentToken` and optional `extra` data (e.g. `{ "phoneCode": "123456" }`). `OnEnrollmentVerify` runs: the app checks its own factors. A returned error increments `attempts`. On success the new challenge is bound to the enrollment (`enrollmentRef`).
 
 **Binding to the first device** (`bindToFirstDevice`, per token, default from `Config.Enrollment.BindToFirstDevice`). It limits a token that was forwarded or intercepted (A5) to the browser that opened it first:
 
 - The first `enrollment/status` or `register/options` call with a valid, unbound token binds it. The module generates a 256-bit binding secret, stores its SHA-256 in `bindingHash`, sets `boundAt`, and returns the secret once in the response. The client keeps it in `sessionStorage`.
-- Every later call with that token must also send `bindingSecret`. A missing or wrong secret gets the generic error, does **not** count towards `attempts`, and fires `OnEnrollmentBindingMismatch` with allow-listed request data (time, IP, user agent). The application can show these attempts to an administrator or revoke the token with `pa.RevokeEnrollment`.
+- Every later call with that token must also send `bindingSecret`. A missing or wrong secret gets the generic error, does **not** count towards `attempts`, and fires `OnEnrollmentBindingMismatch` with allow-listed request data (time, IP, user agent). The application can show these attempts to an administrator or revoke the token with `pk.RevokeEnrollment`.
 - If the legitimate user loses the binding (other browser, closed tab), they need a new token. Binding is one-way: the module never re-binds a token.
 4. `POST .../register/verify`. In one transaction: consume the challenge, re-check that the bound enrollment is still unconsumed, unexpired and unrevoked, optionally revoke existing credentials, codes and sessions, store the new credential, mark the token consumed, fire `OnEnrollmentCompleted`. If two registrations were started with the same token, only the first to finish succeeds. The response is a normal auth response, issued after any `tokenKey` rotation, so the user is signed in.
 

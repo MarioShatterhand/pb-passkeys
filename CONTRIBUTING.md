@@ -29,7 +29,7 @@ You may use AI tools. You are responsible for every line you submit: you must un
 
 ## Reporting bugs
 
-Include the pocketauthn version, PocketBase version, Go version, browser and authenticator (e.g. "Chrome 140 on Android 15, Google Password Manager"), and the steps to reproduce. Never paste real tokens, recovery codes or database files.
+Include the pb-passkeys version, PocketBase version, Go version, browser and authenticator (e.g. "Chrome 140 on Android 15, Google Password Manager"), and the steps to reproduce. Never paste real tokens, recovery codes or database files.
 
 ## Code of conduct
 

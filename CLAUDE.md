@@ -4,7 +4,7 @@ Guidance for Claude Code (and humans) working in this repository.
 
 ## What this is
 
-`pocketauthn` (working name): an open-source Go module that adds passkey (WebAuthn) authentication to PocketBase applications, plus a small TypeScript client. It is a **generic library**. It must stay usable by anyone, for any app.
+`pb-passkeys`: an open-source Go module that adds passkey (WebAuthn) authentication to PocketBase applications, plus a small TypeScript client. It is a **generic library**. It must stay usable by anyone, for any app.
 
 Read before changing anything substantial:
 - `docs/architecture.md`: module boundary, data model, flows
@@ -27,7 +27,7 @@ Read before changing anything substantial:
 ## Layout (planned)
 
 ```
-/                 Go module root (package pocketauthn: Register, Config validation, hooks)
+/                 Go module root (package passkeys: Register, Config validation, hooks)
 internal/ceremony go-webauthn wrapper
 internal/store    collections, migrations, queries, cleanup jobs
 internal/recovery recovery codes, enrollment tokens, step-up

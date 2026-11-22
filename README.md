@@ -1,10 +1,10 @@
-# pocketauthn
+# pb-passkeys
 
-> **Working name.** Passkey (WebAuthn) authentication for [PocketBase](https://pocketbase.io), as a Go module you add to your own PocketBase build.
+> Passkey (WebAuthn) authentication for [PocketBase](https://pocketbase.io), as a Go module you add to your own PocketBase build.
 >
 > **Status: design phase.** There is no code yet. The documents in `docs/` describe what will be built. Feedback via issues is welcome.
 
-pocketauthn is an independent, community project. It is **not affiliated with or endorsed by PocketBase** or its author.
+pb-passkeys is an independent, community project. It is **not affiliated with or endorsed by PocketBase** or its author.
 
 ## What it does
 
@@ -33,13 +33,13 @@ import (
 	"log"
 
 	"github.com/pocketbase/pocketbase"
-	"github.com/OWNER/pocketauthn"
+	passkeys "github.com/MarioShatterhand/pb-passkeys"
 )
 
 func main() {
 	app := pocketbase.New()
 
-	pocketauthn.MustRegister(app, pocketauthn.Config{
+	passkeys.MustRegister(app, passkeys.Config{
 		RPID:            "example.com",
 		RPDisplayName:   "Example",
 		RPOrigins:       []string{"https://example.com"},
@@ -54,7 +54,7 @@ func main() {
 
 ```ts
 import PocketBase from "pocketbase";
-import { passkeys } from "pocketauthn-client";
+import { passkeys } from "pb-passkeys";
 
 const pb = new PocketBase("https://example.com");
 const pk = passkeys(pb, { collection: "users" });
@@ -65,7 +65,7 @@ console.log(pb.authStore.record);
 
 ## Requirements
 
-- PocketBase used **as a Go framework** (a custom `main.go`). The prebuilt PocketBase binary cannot load Go modules. We plan to publish prebuilt "PocketBase + pocketauthn" binaries for people who do not want to write Go (see [docs/versioning.md](docs/versioning.md)).
+- PocketBase used **as a Go framework** (a custom `main.go`). The prebuilt PocketBase binary cannot load Go modules. We plan to publish prebuilt "PocketBase + pb-passkeys" binaries for people who do not want to write Go (see [docs/versioning.md](docs/versioning.md)).
 - HTTPS (WebAuthn requires a secure context; `localhost` is allowed for development).
 
 ## Documentation

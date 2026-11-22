@@ -5,7 +5,7 @@ Status: draft. Names and signatures are proposals and may change before v0.1.0. 
 ## 1. Go configuration
 
 ```go
-pa := pocketauthn.MustRegister(app, pocketauthn.Config{
+pk := passkeys.MustRegister(app, passkeys.Config{
 	// Relying party
 	RPID:          "example.com",                 // required; registrable domain, no scheme/port
 	RPDisplayName: "Example",                     // required
@@ -16,8 +16,8 @@ pa := pocketauthn.MustRegister(app, pocketauthn.Config{
 	AuthCollections: []string{"users"},           // auth collections that get passkey routes
 
 	// Ceremony policy
-	UserVerification: pocketauthn.UVRequired,     // Required (default) | Preferred | Discouraged
-	ResidentKey:      pocketauthn.ResidentKeyRequired, // only Required in v0.x, see open-questions.md (decision 5)
+	UserVerification: passkeys.UVRequired,     // Required (default) | Preferred | Discouraged
+	ResidentKey:      passkeys.ResidentKeyRequired, // only Required in v0.x, see open-questions.md (decision 5)
 	Attestation:      "none",                     // only "none" in v0.x
 	Algorithms:       nil,                        // default: ES256, EdDSA, RS256
 	ChallengeTTL:     5 * time.Minute,
@@ -25,36 +25,36 @@ pa := pocketauthn.MustRegister(app, pocketauthn.Config{
 	MaxPendingChallenges: 10000,                  // cap on unexpired challenges; above it public ceremonies get 429
 
 	// Step-up (fresh passkey assertion before sensitive actions)
-	StepUp: pocketauthn.StepUpConfig{
+	StepUp: passkeys.StepUpConfig{
 		TTL:              5 * time.Minute,         // lifetime of a stepUpToken
 		ForNewCredential: true,                    // require step-up to add a credential when one already exists
-		ForCredentialDelete: pocketauthn.StepUpDeleteOff, // Off (default) | AnyCredential | OtherCredential
+		ForCredentialDelete: passkeys.StepUpDeleteOff, // Off (default) | AnyCredential | OtherCredential
 	},
 
 	// Credentials
 	MaxCredentialsPerUser: 10,
 	AllowDeleteLastCredential: false,             // default false: prevents self-lockout
-	SignCountPolicy: pocketauthn.SignCountWarn,   // Warn (default) | Reject | Ignore
+	SignCountPolicy: passkeys.SignCountWarn,   // Warn (default) | Reject | Ignore
 
 	// Recovery
-	RecoveryCodes: pocketauthn.RecoveryCodesConfig{
+	RecoveryCodes: passkeys.RecoveryCodesConfig{
 		Enabled: true,
 		Count:   8,
 		EnrollmentTTL: 15 * time.Minute,           // token returned after redeeming a code
 		MaxConcurrentHashes: 2,                    // global cap on parallel Argon2id verifications
 	},
-	Enrollment: pocketauthn.EnrollmentConfig{
+	Enrollment: passkeys.EnrollmentConfig{
 		DefaultTTL:         24 * time.Hour,
 		DefaultMaxAttempts: 3,
 		BindToFirstDevice:  false,                 // default for tokens that do not set it; see architecture.md 5.3
 	},
 
 	// Mode
-	Passwordless: pocketauthn.PasswordlessOff,    // Off (default) | Warn | Enforce
+	Passwordless: passkeys.PasswordlessOff,    // Off (default) | Warn | Enforce
 
 	// Routing and storage
 	RoutePrefix: "/api/passkeys",                 // routes: {prefix}/{collection}/...
-	Collections: pocketauthn.CollectionNames{},   // zero value = defaults from architecture.md
+	Collections: passkeys.CollectionNames{},   // zero value = defaults from architecture.md
 })
 ```
 
@@ -65,7 +65,7 @@ Startup validation fails (returns an error from `Register`, panics in `MustRegis
 - a configured collection does not exist, is not an auth collection, or is `_superusers`;
 - `Passwordless: Enforce` and password or OTP auth is enabled on a configured collection.
 
-A helper `pocketauthn.ConfigFromEnv(prefix string)` may be added for people who prefer environment variables (`PA_RP_ID`, `PA_RP_ORIGINS`, ...). Not in v0.1.
+A helper `passkeys.ConfigFromEnv(prefix string)` may be added for people who prefer environment variables (`PB_PASSKEYS_RP_ID`, `PB_PASSKEYS_RP_ORIGINS`, ...). Not in v0.1.
 
 ## 2. HTTP routes
 
@@ -107,23 +107,23 @@ Sensitive actions require a fresh passkey assertion: generating recovery codes a
 
 ```go
 // Enrollment tokens: the generic recovery/invitation primitive.
-tok, err := pa.IssueEnrollment(ctx, pocketauthn.EnrollmentRequest{
+tok, err := pk.IssueEnrollment(ctx, passkeys.EnrollmentRequest{
 	Record:         userRecord,          // *core.Record from an auth collection
 	Purpose:        "admin_reset",       // free-form string, passed to hooks
 	TTL:            24 * time.Hour,
 	MaxAttempts:    3,
 	RevokeExisting: true,                // delete old credentials + codes, rotate tokenKey
 	CreatedBy:      adminRecord.Id,
-	BindToFirstDevice: pocketauthn.Bool(true), // nil = Config.Enrollment.BindToFirstDevice
+	BindToFirstDevice: passkeys.Bool(true), // nil = Config.Enrollment.BindToFirstDevice
 	Meta:           map[string]any{"phoneCodeHash": h},
 })
 // tok.Token is plaintext, returned only here. tok.ExpiresAt, tok.Id.
 
-pa.RevokeEnrollment(ctx, id)
-pa.RevokeAllCredentials(ctx, userRecord)   // also deletes codes, rotates tokenKey
-pa.ListCredentials(ctx, userRecord)
+pk.RevokeEnrollment(ctx, id)
+pk.RevokeAllCredentials(ctx, userRecord)   // also deletes codes, rotates tokenKey
+pk.ListCredentials(ctx, userRecord)
 
-pocketauthn.CredentialKind(credRecord)     // "synced" | "device" | "security_key" | "unknown"; display only
+passkeys.CredentialKind(credRecord)     // "synced" | "device" | "security_key" | "unknown"; display only
 ```
 
 ## 4. Hooks
@@ -147,11 +147,11 @@ All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/
 Example of an application-specific factor, which stays in the application:
 
 ```go
-pa.OnEnrollmentVerify().BindFunc(func(e *pocketauthn.EnrollmentVerifyEvent) error {
+pk.OnEnrollmentVerify().BindFunc(func(e *passkeys.EnrollmentVerifyEvent) error {
 	if e.Enrollment.Purpose == "admin_reset" {
 		code, _ := e.Extra["phoneCode"].(string)
 		if !checkPhoneCode(e.Enrollment.Meta, code) {
-			return pocketauthn.ErrEnrollmentVerificationFailed // counts as a failed attempt
+			return passkeys.ErrEnrollmentVerificationFailed // counts as a failed attempt
 		}
 	}
 	return e.Next()

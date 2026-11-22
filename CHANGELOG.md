@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Design: `authenticatorAttachment` stored with each credential; `CredentialKind` helper (`synced` / `device` / `security_key` / `unknown`) for display.
 
 ### Changed
+- Project renamed from the working name `pocketauthn` to `pb-passkeys`.
 - Design: enrollment status moved from `GET .../enrollment/{token}` to `POST .../enrollment/status`; secrets are never sent in URLs.
 - Design: non-discoverable login with `identity` removed from v0.x (account enumeration); `ResidentKey` is `Required` only.
 - Design: `Passwordless` is a three-value setting (`Off` / `Warn` / `Enforce`) everywhere.

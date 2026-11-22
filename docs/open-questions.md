@@ -17,7 +17,7 @@ Each item must be resolved (verified in the pinned PocketBase source, or decided
 
 ## Decisions open for maintainers
 
-1. **Project name** and GitHub owner (personal account or organisation). Changes the Go module path.
+1. **npm package name** for the client. Proposed `pb-passkeys`; availability on npm not yet checked.
 2. **Client dependency.** Proposed zero dependencies. Alternative: depend on `@simplewebauthn/browser` (mature, but another package on the login path).
 3. **Route prefix.** Proposed `/api/passkeys/{collection}/...`. Alternative `/api/collections/{collection}/passkey/...` mirrors built-in auth routes but risks clashing with future PocketBase routes.
 4. **User handle.** Proposed: the PocketBase record ID (random, not personal data). Alternative: a separate random 64-byte handle per user, which allows rotation.
@@ -25,5 +25,6 @@ Each item must be resolved (verified in the pinned PocketBase source, or decided
 
 ## Resolved
 
+- **Project name: pb-passkeys.** Go module `github.com/MarioShatterhand/pb-passkeys`, package `passkeys`, under the maintainer's personal GitHub account. (Decided 2026-11-22.)
 - **License: MIT**, matching PocketBase. `LICENSE` is in the repository. (Decided by the maintainer, initial commit.)
 - **Contributor sign-off: DCO** (`Signed-off-by`), no CLA. Required in CONTRIBUTING.md and CLAUDE.md.
