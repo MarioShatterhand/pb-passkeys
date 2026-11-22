@@ -1,0 +1,34 @@
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local AI-tooling state (oh-my-claudecode, Claude Code local settings)
+.omc/
+.claude/settings.local.json
+
+# PocketBase data directories (contain user data and secrets)
+pb_data/
+**/pb_data/
+
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+go.work
+go.work.sum
+
+# Node / client
+node_modules/
+client/dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Environment files
+.env
+.env.*
+!.env.example
