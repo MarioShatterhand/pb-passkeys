@@ -151,7 +151,7 @@ No API access. Applications create enrollments through the Go API (`pk.IssueEnro
    - updates `signCount`/`backupState`/`lastUsedAt` and applies `SignCountPolicy` (firing `OnSignCountAnomaly` on regression);
    - fires `OnBeforeLogin` (may reject) and returns the standard auth response.
 
-Non-discoverable login with an `identity` is not part of v0.x, see [open-questions.md](open-questions.md) (decision 5).
+Non-discoverable login with an `identity` is not part of v0.x, see [open-questions.md](open-questions.md) (decision 3).
 
 ### 5.3 Enrollment token (invitation, admin reset, recovery)
 

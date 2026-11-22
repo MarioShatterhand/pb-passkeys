@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Design: `authenticatorAttachment` stored with each credential; `CredentialKind` helper (`synced` / `device` / `security_key` / `unknown`) for display.
 - Go module `github.com/MarioShatterhand/pb-passkeys` (package `passkeys`), pinned to PocketBase v0.40.6 and go-webauthn v0.18.2. No functionality yet.
 - Secret scanning with gitleaks: pre-commit hook in `.githooks/` and a CI workflow.
+- `passkeys.Register` and `MustRegister` with `Config`: defaults, validation of the relying party settings and options, and startup checks of the configured auth collections. The module does not serve any route yet.
 - `internal/testauthn`: a software authenticator for tests (ES256, `none` attestation) that produces real WebAuthn registration and assertion responses.
 - Design: PocketBase MFA behaviour is kept for passkey logins (MFA should be off for passkey collections); the names of the module's collections are fixed after the first start.
 - Design: assumptions about PocketBase v0.40.6 and go-webauthn v0.18.2 verified in source and recorded in `docs/open-questions.md`; the challenge lifetime is set on the go-webauthn session explicitly; passwordless users get `Record.SetRandomPassword()`.

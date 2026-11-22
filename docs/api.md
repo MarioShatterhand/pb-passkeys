@@ -17,9 +17,9 @@ pk := passkeys.MustRegister(app, passkeys.Config{
 
 	// Ceremony policy
 	UserVerification: passkeys.UVRequired,     // Required (default) | Preferred | Discouraged
-	ResidentKey:      passkeys.ResidentKeyRequired, // only Required in v0.x, see open-questions.md (decision 5)
+	// Discoverable credentials (resident keys) are always required in v0.x; see open-questions.md (decision 3).
 	Attestation:      "none",                     // only "none" in v0.x
-	Algorithms:       nil,                        // default: ES256, EdDSA, RS256
+	Algorithms:       nil,                        // default: AlgES256, AlgEdDSA, AlgRS256
 	ChallengeTTL:     5 * time.Minute,
 	Timeout:          2 * time.Minute,            // hint sent to the browser
 	MaxPendingChallenges: 10000,                  // cap on unexpired challenges; above it public ceremonies get 429
@@ -58,15 +58,24 @@ pk := passkeys.MustRegister(app, passkeys.Config{
 })
 ```
 
-Startup validation fails (returns an error from `Register`, panics in `MustRegister`) when:
+Validation happens in two steps. Every error wraps `passkeys.ErrInvalidConfig` and lists all problems found, not only the first.
 
-- `RPID` is empty, has a scheme, or is not a suffix of every `https` origin host;
-- an origin uses `http` on anything other than `localhost`/`127.0.0.1`;
-- a configured collection does not exist, is not an auth collection, or is `_superusers`;
-- `Passwordless: Enforce` and password or OTP auth is enabled on a configured collection;
-- one of the module's own collections (`Collections`) is missing after migrations ran, which happens when the names were changed after the first start.
+`Register` returns an error (and `MustRegister` panics) for everything that can be checked without a database:
 
-It logs a warning, without failing, when a configured auth collection has PocketBase MFA enabled: a passkey login would then require a second method.
+- `RPID` is empty, has a scheme, port or path, is not lower case, or is an IP address;
+- an origin is not `scheme://host[:port]`, uses `http` on anything other than `localhost` or a loopback address, or its host is neither `RPID` nor one of its subdomains;
+- `AuthCollections` is empty or names `_superusers`;
+- an option has an unsupported value (attestation other than `none`, an unknown algorithm, `Timeout` longer than `ChallengeTTL`, `ChallengeTTL` above one hour, a malformed `RoutePrefix`, a collection name starting with `_`).
+
+Startup fails, when the server begins to serve and after migrations ran, for everything that needs the database:
+
+- a configured auth collection does not exist, is not an auth collection, or is the superusers collection given by ID;
+- `Passwordless: Enforce` and password or OTP auth is enabled on a configured collection (0.2);
+- one of the module's own collections (`Collections`) is missing, which happens when the names were changed after the first start.
+
+The configuration block above shows the full design. Version 0.1 implements the relying party fields, `AuthCollections`, the ceremony policy, `MaxPendingChallenges`, the credential settings, `RoutePrefix` and `Collections`; `StepUp`, `RecoveryCodes`, `Enrollment` and `Passwordless` arrive in 0.2.
+
+It logs a warning, without failing, when a configured auth collection has PocketBase MFA enabled (a passkey login would then require a second method), and when PocketBase rate limiting is off or has no rule that covers `RoutePrefix`.
 
 A helper `passkeys.ConfigFromEnv(prefix string)` may be added for people who prefer environment variables (`PB_PASSKEYS_RP_ID`, `PB_PASSKEYS_RP_ORIGINS`, ...). Not in v0.1.
 

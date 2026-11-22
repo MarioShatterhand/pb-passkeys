@@ -10,15 +10,15 @@ Each item must be resolved (verified in the pinned PocketBase source, or decided
 
 1. **npm package name** for the client. Proposed `pb-passkeys`; availability on npm not yet checked.
 2. **Client dependency.** Proposed zero dependencies. Alternative: depend on `@simplewebauthn/browser` (mature, but another package on the login path).
-3. **Route prefix.** Proposed `/api/passkeys/{collection}/...`. Alternative `/api/collections/{collection}/passkey/...` mirrors built-in auth routes but risks clashing with future PocketBase routes.
-4. **User handle.** Proposed: the PocketBase record ID (random, not personal data). Alternative: a separate random 64-byte handle per user, which allows rotation.
-5. **Non-discoverable login.** Logging in with an `identity` returns that user's `allowCredentials`, which reveals whether the account exists and how many keys it has. Proposed for v0.x: not supported; `ResidentKey` only accepts `Required`. Later option: for unknown identities return deterministic fake `allowCredentials` derived with HMAC from a server secret, which needs a stored per-installation key.
+3. **Non-discoverable login.** Logging in with an `identity` returns that user's `allowCredentials`, which reveals whether the account exists and how many keys it has. Proposed for v0.x: not supported; `ResidentKey` only accepts `Required`. Later option: for unknown identities return deterministic fake `allowCredentials` derived with HMAC from a server secret, which needs a stored per-installation key.
 
 ## Resolved
 
 - **Project name: pb-passkeys.** Go module `github.com/MarioShatterhand/pb-passkeys`, package `passkeys`, under the maintainer's personal GitHub account. (Decided 2026-11-22.)
 - **License: MIT**, matching PocketBase. `LICENSE` is in the repository. (Decided by the maintainer, initial commit.)
 - **Contributor sign-off: DCO** (`Signed-off-by`), no CLA. Required in CONTRIBUTING.md and CLAUDE.md.
+- **Route prefix: `/api/passkeys/{collection}/...`** (configurable through `RoutePrefix`). The alternative under `/api/collections/` was rejected because it could clash with future PocketBase routes. (Decided 2026-11-22.)
+- **User handle: the PocketBase record ID.** It is random and carries no personal data. A separate rotatable handle was rejected for v0.x because it needs extra storage. (Decided 2026-11-22.)
 - **Passkeys and PocketBase MFA: PocketBase's behaviour is kept.** The module always passes the method name `"passkey"` to `RecordAuthResponse`. If a collection has MFA enabled, PocketBase answers a passkey login with 401 and an `mfaId` and asks for a second, different method. A passkey with user verification is already two factors, so the documentation recommends MFA **off** for collections that use passkeys. There is no setting to skip MFA: the only way would be an empty method name, which also drops the new-device login alert. (Decided 2026-11-22.)
 - **Collection names are fixed after the first start.** The module's migration creates its collections under the names in `Config.Collections` at the time it first runs. The module does not rename them later; at startup it fails with a clear error if a configured collection is missing. To rename, the application renames the collections itself and updates the config. (Decided 2026-11-22.)
 
