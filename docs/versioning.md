@@ -10,7 +10,7 @@
 
 PocketBase is pre-1.0 and changes its Go API between minor releases. Policy:
 
-- Each pb-passkeys minor release supports a stated **range of PocketBase minor versions**, at least the **current and previous** minor.
+- Each pb-passkeys minor release supports a stated **range of PocketBase minor versions**. The first release (0.1) supports only the PocketBase minor that is current at that time. From then on, when a new PocketBase minor appears, the previous one stays supported, so the range is at least the **current and previous** minor.
 - `go.mod` requires the lowest supported PocketBase version. Users may upgrade PocketBase within the supported range without upgrading this module.
 - CI runs the full Go test suite against the lowest supported patch and the latest patch of every supported minor (matrix in `.github/workflows/ci.yml`).
 - A scheduled CI job (weekly) tests against the newest PocketBase release and opens an issue when it fails, so breakage is found before users report it.
@@ -18,9 +18,9 @@ PocketBase is pre-1.0 and changes its Go API between minor releases. Policy:
 
 | pb-passkeys | PocketBase | Go | go-webauthn |
 |---|---|---|---|
-| 0.1.x (planned) | 0.39.x – 0.40.x **[to confirm]** | 1.27+ | 0.18.x |
+| 0.1.x (planned) | 0.40.x (from v0.40.6) | 1.27+ | 0.18.x |
 
-As of 2026-11-22 the Go module proxy lists PocketBase **v0.40.6** (2026-10-23) as the latest release, requiring Go 1.27, and go-webauthn **v0.18.2** (2026-09-19).
+`go.mod` pins PocketBase **v0.40.6** (the latest release as of 2026-11-22, requires Go 1.27) and go-webauthn **v0.18.2**. PocketBase 0.39 is not supported: nothing was released for it, so supporting it would only double the work of verifying every assumption in [open-questions.md](open-questions.md) against two versions of a pre-1.0 API.
 
 ## 3. Roadmap
 
