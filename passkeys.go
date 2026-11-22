@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
+
+	"github.com/MarioShatterhand/pb-passkeys/internal/store"
 )
 
 // Module is the handle returned by [Register]. It gives access to the
@@ -21,9 +23,13 @@ type Module struct {
 // Problems that can be found without a database (malformed relying party ID,
 // insecure origins, unsupported options) are returned immediately, wrapped in
 // [ErrInvalidConfig]. Problems that depend on the database (a collection in
-// AuthCollections that does not exist or is not an auth collection) are
-// detected when the server starts, after migrations have run, and make
-// startup fail with an error that also wraps [ErrInvalidConfig].
+// AuthCollections that does not exist or is not an auth collection, one of
+// the module's own collections missing after the first start) are detected
+// when the server starts, after migrations have run, and make startup fail
+// with an error that also wraps [ErrInvalidConfig].
+//
+// On the first start the module creates its own collections, named in
+// Config.Collections.
 func Register(app core.App, cfg Config) (*Module, error) {
 	if app == nil {
 		return nil, fmt.Errorf("%w: app is nil", ErrInvalidConfig)
@@ -37,8 +43,22 @@ func Register(app core.App, cfg Config) (*Module, error) {
 	m := &Module{app: app, cfg: cfg}
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		// PocketBase has applied the application's migrations by now, so the
+		// configured auth collections exist if they ever will.
 		if err := m.checkCollections(e.App); err != nil {
 			return err
+		}
+
+		names := store.Names{
+			Credentials: m.cfg.Collections.Credentials,
+			Challenges:  m.cfg.Collections.Challenges,
+		}
+
+		if err := store.Migrate(e.App, names); err != nil {
+			return fmt.Errorf("passkeys: %w", err)
+		}
+		if err := store.Check(e.App, names); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 		}
 
 		for _, warning := range m.startupWarnings(e.App) {

@@ -7,6 +7,8 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
+
+	"github.com/MarioShatterhand/pb-passkeys/internal/store"
 )
 
 // newTestApp starts an in-process PocketBase with a temporary data directory
@@ -294,5 +296,69 @@ func setRateLimits(t *testing.T, app core.App, enabled bool, rules ...core.RateL
 
 	if err := app.Save(settings); err != nil {
 		t.Fatalf("save settings: %v", err)
+	}
+}
+
+func TestStartupCreatesOwnCollections(t *testing.T) {
+	app := newTestApp(t)
+
+	cfg := testConfig("members")
+	cfg.Collections = CollectionNames{Credentials: "pk_credentials"} // the other keeps its default
+
+	if _, err := Register(app, cfg); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	if _, err := app.FindCollectionByNameOrId("pk_credentials"); err == nil {
+		t.Fatal("collections were created before the server started")
+	}
+
+	// Two starts: the second must find everything in place.
+	for range 2 {
+		if err := serve(app); err != nil {
+			t.Fatalf("startup failed: %v", err)
+		}
+	}
+
+	for _, name := range []string{"pk_credentials", DefaultChallengesCollection} {
+		if _, err := app.FindCollectionByNameOrId(name); err != nil {
+			t.Errorf("collection %q was not created: %v", name, err)
+		}
+	}
+}
+
+// The names of the module's collections are fixed after the first start
+// (docs/open-questions.md). A changed name must stop the server instead of
+// silently starting with new, empty collections.
+func TestStartupFailsWhenOwnCollectionsWereRenamedInConfig(t *testing.T) {
+	app := newTestApp(t)
+
+	// What a first start with the default names leaves behind.
+	if err := store.Migrate(app, store.Names{
+		Credentials: DefaultCredentialsCollection,
+		Challenges:  DefaultChallengesCollection,
+	}); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	cfg := testConfig("members")
+	cfg.Collections = CollectionNames{Credentials: "renamed_credentials", Challenges: "renamed_challenges"}
+
+	if _, err := Register(app, cfg); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	err := serve(app)
+	if err == nil {
+		t.Fatal("startup succeeded with renamed collections")
+	}
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("error does not wrap ErrInvalidConfig: %v", err)
+	}
+	if !strings.Contains(err.Error(), `"renamed_credentials" is missing`) {
+		t.Errorf("error does not name the missing collection: %v", err)
+	}
+	if _, findErr := app.FindCollectionByNameOrId("renamed_credentials"); findErr == nil {
+		t.Error("a collection was created under the new name")
 	}
 }
