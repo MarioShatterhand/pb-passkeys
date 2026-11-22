@@ -11,6 +11,7 @@ Thanks for your interest. This project is on the login path of other people's ap
 
 - Go (version in `go.mod`), Node.js 22+ for the client, and Chromium via Playwright for E2E.
 - See the commands in [CLAUDE.md](CLAUDE.md#commands-once-code-exists).
+- Install [gitleaks](https://github.com/gitleaks/gitleaks/releases) and enable the pre-commit hook once per clone: `git config core.hooksPath .githooks`. It blocks commits that contain secrets; CI runs the same scan on the full history.
 
 ## Pull requests
 

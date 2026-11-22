@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Design: optional binding of an enrollment token to the first browser that uses it (`bindToFirstDevice`) and the `OnEnrollmentBindingMismatch` hook.
 - Design: `authenticatorAttachment` stored with each credential; `CredentialKind` helper (`synced` / `device` / `security_key` / `unknown`) for display.
 - Go module `github.com/MarioShatterhand/pb-passkeys` (package `passkeys`), pinned to PocketBase v0.40.6 and go-webauthn v0.18.2. No functionality yet.
+- Secret scanning with gitleaks: pre-commit hook in `.githooks/` and a CI workflow.
 
 ### Changed
 - Project renamed from the working name `pocketauthn` to `pb-passkeys`.

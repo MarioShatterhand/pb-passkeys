@@ -1,0 +1,6 @@
+# gitleaks configuration. Uses the default rule set.
+# Add allowlist entries here only for confirmed false positives, with a comment.
+title = "pb-passkeys"
+
+[extend]
+useDefault = true

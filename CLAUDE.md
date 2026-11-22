@@ -36,6 +36,7 @@ internal/testauthn software authenticator for tests (ES256, "none" attestation)
 client/           TypeScript client (npm package), Vitest tests
 examples/minimal  example app, target of Playwright E2E
 docs/             design documents
+.githooks/        pre-commit hook (gitleaks); enable with `git config core.hooksPath .githooks`
 ```
 
 ## Commands (once code exists)
