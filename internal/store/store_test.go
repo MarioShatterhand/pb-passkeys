@@ -174,7 +174,7 @@ func TestSchemaHasNoPlaintextSecretFields(t *testing.T) {
 			"authenticatorAttachment", "backupEligible", "backupState", "attestationFormat", "name", "lastUsedAt",
 			"created", "updated",
 		},
-		names.Challenges: {"id", "type", "collectionRef", "recordRef", "sessionData", "expiresAt", "created"},
+		names.Challenges: {"id", "challenge", "type", "collectionRef", "recordRef", "sessionData", "expiresAt", "created"},
 	}
 
 	for name, fields := range want {

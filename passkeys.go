@@ -10,6 +10,12 @@ import (
 	"github.com/MarioShatterhand/pb-passkeys/internal/store"
 )
 
+// The cron job that removes expired challenges.
+const (
+	cleanupJobID    = "pbPasskeysCleanup"
+	cleanupSchedule = "*/5 * * * *" // every 5 minutes
+)
+
 // Module is the handle returned by [Register]. It gives access to the
 // effective configuration and, in later versions, to hooks and the Go API.
 type Module struct {
@@ -59,6 +65,16 @@ func Register(app core.App, cfg Config) (*Module, error) {
 		}
 		if err := store.Check(e.App, names); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+		}
+
+		// Expired challenges are already unusable; the job only frees the space.
+		cleanup := func() {
+			if _, err := store.DeleteExpiredChallenges(app, names); err != nil {
+				app.Logger().Error("passkeys: cleanup of expired challenges failed", "error", err.Error())
+			}
+		}
+		if err := e.App.Cron().Add(cleanupJobID, cleanupSchedule, cleanup); err != nil {
+			return fmt.Errorf("passkeys: schedule cleanup: %w", err)
 		}
 
 		for _, warning := range m.startupWarnings(e.App) {

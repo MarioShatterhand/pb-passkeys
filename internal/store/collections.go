@@ -39,6 +39,7 @@ const (
 
 // Fields of the challenges collection.
 const (
+	FieldChallenge   = "challenge"
 	FieldType        = "type"
 	FieldSessionData = "sessionData"
 	FieldExpiresAt   = "expiresAt"
@@ -115,6 +116,10 @@ func newChallengesCollection(name string) *core.Collection {
 	c.DeleteRule = nil
 
 	c.Fields.Add(
+		// The challenge as sent to the client. It is the lookup key at
+		// verification: the client proves which ceremony it answers by
+		// returning the challenge inside the signed client data.
+		&core.TextField{Name: FieldChallenge, Required: true, Hidden: true, Max: 255},
 		&core.TextField{Name: FieldType, Required: true, Max: 32},
 		&core.TextField{Name: FieldCollectionRef, Required: true},
 		// Empty for a discoverable login, where the user is not known yet.
@@ -124,6 +129,7 @@ func newChallengesCollection(name string) *core.Collection {
 		&core.AutodateField{Name: FieldCreated, OnCreate: true},
 	)
 
+	c.AddIndex("idx_"+name+"_challenge", true, FieldChallenge, "")
 	c.AddIndex("idx_"+name+"_expiresAt", false, FieldExpiresAt, "")
 
 	return c
@@ -135,7 +141,7 @@ func newChallengesCollection(name string) *core.Collection {
 func requiredFields(names Names) map[string][]string {
 	return map[string][]string{
 		names.Credentials: {FieldCollectionRef, FieldRecordRef, FieldCredentialID, FieldPublicKey, FieldSignCount, FieldBackupEligible},
-		names.Challenges:  {FieldType, FieldCollectionRef, FieldSessionData, FieldExpiresAt},
+		names.Challenges:  {FieldChallenge, FieldType, FieldCollectionRef, FieldSessionData, FieldExpiresAt},
 	}
 }
 

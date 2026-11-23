@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -360,5 +361,49 @@ func TestStartupFailsWhenOwnCollectionsWereRenamedInConfig(t *testing.T) {
 	}
 	if _, findErr := app.FindCollectionByNameOrId("renamed_credentials"); findErr == nil {
 		t.Error("a collection was created under the new name")
+	}
+}
+
+func TestStartupSchedulesChallengeCleanup(t *testing.T) {
+	app := newTestApp(t)
+
+	if _, err := Register(app, testConfig("members")); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if err := serve(app); err != nil {
+		t.Fatalf("startup failed: %v", err)
+	}
+
+	names := store.Names{Credentials: DefaultCredentialsCollection, Challenges: DefaultChallengesCollection}
+
+	expired := store.Challenge{
+		Value:         "expired-1",
+		Type:          store.ChallengeLogin,
+		CollectionRef: "col-members",
+		SessionData:   map[string]string{"challenge": "expired-1"},
+		ExpiresAt:     time.Now().Add(-time.Minute),
+	}
+	if err := store.SaveChallenge(app, names, expired, 10); err != nil {
+		t.Fatalf("SaveChallenge: %v", err)
+	}
+
+	var ran bool
+
+	for _, job := range app.Cron().Jobs() {
+		if job.Id() == cleanupJobID {
+			job.Run()
+			ran = true
+		}
+	}
+	if !ran {
+		t.Fatal("the cleanup job is not scheduled")
+	}
+
+	n, err := app.CountRecords(names.Challenges)
+	if err != nil {
+		t.Fatalf("count challenges: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("challenges after cleanup = %d, want 0", n)
 	}
 }

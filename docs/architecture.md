@@ -95,6 +95,7 @@ Server-side ceremony state:
 
 | Field | Notes |
 |---|---|
+| `challenge` | The challenge as sent to the client, hidden, **unique**. It is the lookup key at verification: the server reads the challenge from the client data of the response and finds the ceremony by it, so clients send nothing but the standard WebAuthn response |
 | `type` | `registration`, `login` or `step_up`; a challenge can only finish the ceremony type it was created for |
 | `collectionRef` | Always set: the auth collection from the route |
 | `recordRef` | Set for registration and step-up; empty for discoverable login |
@@ -102,7 +103,7 @@ Server-side ceremony state:
 | `sessionData` | json, hidden |
 | `expiresAt` | Default 5 min (`ChallengeTTL`); also written to go-webauthn's `SessionData.Expires`, which would otherwise follow the shorter browser `Timeout` |
 
-A challenge is consumed atomically (read and delete in one transaction) on first use, success or failure. No API access. Because `login/options` is public, the number of unexpired challenges is capped (`Config.MaxPendingChallenges`); above the cap, new public ceremonies are refused with 429 until cleanup or expiry frees space.
+A challenge is consumed atomically (read and delete in one transaction) on first use, success or failure; this includes a challenge presented to the wrong ceremony type or collection, or after it expired. Expired rows are removed by a cron job every 5 minutes. No API access. Because `login/options` is public, the number of unexpired challenges is capped (`Config.MaxPendingChallenges`); above the cap, new public ceremonies are refused with 429 until cleanup or expiry frees space.
 
 ### `passkey_step_ups`
 
