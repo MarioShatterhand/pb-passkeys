@@ -13,14 +13,31 @@ import (
 // collectionParam is the name of the path parameter that holds the auth collection.
 const collectionParam = "collection"
 
+// modulePaths lists the module's routes, relative to
+// {RoutePrefix}/{collection}. None of them has a path parameter of its own:
+// secrets are sent in JSON bodies only, because URLs end up in request logs.
+var modulePaths = []string{
+	"/register/options",
+	"/register/verify",
+	"/login/options",
+	"/login/verify",
+}
+
 // bindRoutes mounts the module's routes as {RoutePrefix}/{collection}/...
+// All of them are POST.
 func (m *Module) bindRoutes(e *core.ServeEvent) {
 	group := e.Router.Group(m.cfg.RoutePrefix + "/{" + collectionParam + "}")
 
-	group.POST("/register/options", m.handleRegisterOptions)
-	group.POST("/register/verify", m.handleRegisterVerify)
-	group.POST("/login/options", m.handleLoginOptions)
-	group.POST("/login/verify", m.handleLoginVerify)
+	handlers := map[string]func(*core.RequestEvent) error{
+		"/register/options": m.handleRegisterOptions,
+		"/register/verify":  m.handleRegisterVerify,
+		"/login/options":    m.handleLoginOptions,
+		"/login/verify":     m.handleLoginVerify,
+	}
+
+	for _, path := range modulePaths {
+		group.POST(path, handlers[path])
+	}
 }
 
 // routeCollection resolves the collection named in the path. Only the
