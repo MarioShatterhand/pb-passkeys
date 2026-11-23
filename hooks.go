@@ -53,3 +53,78 @@ func (m *Module) OnRegistrationOptions() *hook.Hook[*RegistrationOptionsEvent] {
 func (m *Module) OnCredentialRegistered() *hook.Hook[*CredentialRegisteredEvent] {
 	return m.onCredentialRegistered
 }
+
+// BeforeLoginEvent is passed to the [Module.OnBeforeLogin] hook.
+type BeforeLoginEvent struct {
+	hook.Event
+	*core.RequestEvent
+
+	// Record is the user whose passkey was just verified.
+	Record *core.Record
+
+	// Credential is the record of the passkey that signed.
+	Credential *core.Record
+
+	// UserVerified tells whether the authenticator verified the user (PIN,
+	// fingerprint, face) for this login. It is always true when the
+	// configured policy is UVRequired.
+	UserVerified bool
+}
+
+// LoginFailedEvent is passed to the [Module.OnLoginFailed] hook.
+type LoginFailedEvent struct {
+	hook.Event
+	*core.RequestEvent
+
+	// Collection is the auth collection of the route.
+	Collection *core.Collection
+
+	// Record is the user the attempt was for, when the module got far enough
+	// to know. It is nil for an unknown credential, a bad signature or an
+	// expired ceremony.
+	Record *core.Record
+
+	// Reason says why the login failed. It is meant for logs and alerting and
+	// must not be shown to the client.
+	Reason string
+}
+
+// SignCountAnomalyEvent is passed to the [Module.OnSignCountAnomaly] hook.
+type SignCountAnomalyEvent struct {
+	hook.Event
+	*core.RequestEvent
+
+	// Record is the user who logged in.
+	Record *core.Record
+
+	// Credential is the passkey whose signature counter did not increase.
+	// Its stored counter is left as it was.
+	Credential *core.Record
+
+	// Rejected tells whether the login is refused because of the anomaly
+	// (SignCountReject) or goes on (SignCountWarn).
+	Rejected bool
+}
+
+// OnBeforeLogin fires after a passkey assertion was verified and before
+// PocketBase issues the auth token. A handler may refuse the login by
+// returning an error instead of calling e.Next(), for example for a disabled
+// account or a network rule.
+func (m *Module) OnBeforeLogin() *hook.Hook[*BeforeLoginEvent] {
+	return m.onBeforeLogin
+}
+
+// OnLoginFailed fires for every failed passkey login. The client always gets
+// the same generic answer; this hook is where the reason is available, for
+// alerting or for a log line that tools such as fail2ban can read.
+func (m *Module) OnLoginFailed() *hook.Hook[*LoginFailedEvent] {
+	return m.onLoginFailed
+}
+
+// OnSignCountAnomaly fires when a login was signed by an authenticator whose
+// signature counter did not increase although it uses one, which may mean the
+// authenticator was cloned. It fires under SignCountWarn and SignCountReject,
+// not under SignCountIgnore.
+func (m *Module) OnSignCountAnomaly() *hook.Hook[*SignCountAnomalyEvent] {
+	return m.onSignCountAnomaly
+}

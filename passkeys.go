@@ -28,6 +28,9 @@ type Module struct {
 
 	onRegistrationOptions  *hook.Hook[*RegistrationOptionsEvent]
 	onCredentialRegistered *hook.Hook[*CredentialRegisteredEvent]
+	onBeforeLogin          *hook.Hook[*BeforeLoginEvent]
+	onLoginFailed          *hook.Hook[*LoginFailedEvent]
+	onSignCountAnomaly     *hook.Hook[*SignCountAnomalyEvent]
 }
 
 // Register validates cfg and attaches the module to app. Call it once, before
@@ -127,6 +130,9 @@ func newModule(app core.App, cfg Config) (*Module, error) {
 		ceremonies:             ceremonies,
 		onRegistrationOptions:  &hook.Hook[*RegistrationOptionsEvent]{},
 		onCredentialRegistered: &hook.Hook[*CredentialRegisteredEvent]{},
+		onBeforeLogin:          &hook.Hook[*BeforeLoginEvent]{},
+		onLoginFailed:          &hook.Hook[*LoginFailedEvent]{},
+		onSignCountAnomaly:     &hook.Hook[*SignCountAnomalyEvent]{},
 	}, nil
 }
 

@@ -20,6 +20,8 @@ func (m *Module) bindRoutes(e *core.ServeEvent) {
 
 	group.POST("/register/options", m.handleRegisterOptions)
 	group.POST("/register/verify", m.handleRegisterVerify)
+	group.POST("/login/options", m.handleLoginOptions)
+	group.POST("/login/verify", m.handleLoginVerify)
 }
 
 // routeCollection resolves the collection named in the path. Only the
@@ -94,7 +96,8 @@ func isClientFault(err error) bool {
 		errors.Is(err, ceremony.ErrMalformedResponse) ||
 		errors.Is(err, store.ErrChallengeNotFound) ||
 		errors.Is(err, store.ErrChallengeExpired) ||
-		errors.Is(err, store.ErrChallengeMismatch)
+		errors.Is(err, store.ErrChallengeMismatch) ||
+		errors.Is(err, store.ErrCredentialNotFound)
 }
 
 // hookError marks an error that came out of an application hook.

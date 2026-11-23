@@ -89,6 +89,8 @@ Request and response shapes of the ceremony routes:
 - `*/verify` routes take `{ "credential": <PublicKeyCredential.toJSON()>, ... }`. The wrapper leaves room for the fields that travel with the response: `name` (an optional label, at most 64 characters) on registration, and tokens in later versions. The server finds the ceremony by the challenge inside the credential's client data, so there is no ceremony ID to pass around.
 - `register/verify` answers with the new record of `passkey_credentials`, as the collection API would return it.
 
+Status codes of the login routes: 404 for a collection that has no passkey routes, 429 when too many ceremonies are pending, and one generic 400 (`Failed to authenticate.`) for every failed login, whatever the reason. After a valid assertion the answer is PocketBase's own: 200 with the standard auth response, 403 when the record does not satisfy the collection's auth rule, or 401 with an `mfaId` when the collection has MFA enabled.
+
 Status codes of the registration routes: 401 without a token, 403 for a token of another collection (including superusers), 404 for a collection that has no passkey routes, 429 when too many ceremonies are pending, and one generic 400 for every refused response.
 
 Secrets (enrollment tokens, binding secrets, step-up tokens, recovery codes) are only ever sent in JSON bodies, never in a path or query string, because URLs are written to PocketBase request logs and proxy access logs.
@@ -154,9 +156,9 @@ All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/
 |---|---|---|
 | `OnRegistrationOptions` | Before options are returned; `e.UserName` and `e.UserDisplayName` can be changed | Custom limits, the label shown by the authenticator |
 | `OnCredentialRegistered` | After a credential is stored (in transaction) | Notify the user, audit log |
-| `OnBeforeLogin` | Assertion verified, before the token is issued | Block disabled accounts, geo rules |
-| `OnLoginFailed` | Any failed login verification | Alerting, fail2ban log line |
-| `OnSignCountAnomaly` | Sign counter did not increase for a credential that reports one; fires under `Warn` and `Reject` | Alert, flag the credential for review |
+| `OnBeforeLogin` | Assertion verified and the credential's counter saved, before the token is issued | Block disabled accounts, geo rules |
+| `OnLoginFailed` | Any failed login; `e.Reason` says why, `e.Record` is set when the user is known | Alerting, fail2ban log line |
+| `OnSignCountAnomaly` | Sign counter did not increase for a credential that reports one; fires under `Warn` and `Reject`, with `e.Rejected` telling which | Alert, flag the credential for review |
 | `OnCredentialDeleted` | After delete through the API or Go | Notify the user |
 | `OnRecoveryCodesGenerated` | After a new set is created | Notify the user |
 | `OnRecoveryCodeRedeemed` | After a code is used | Notify the user, alert when few remain |

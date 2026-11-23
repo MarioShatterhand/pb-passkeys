@@ -2,7 +2,7 @@
 
 > Passkey (WebAuthn) authentication for [PocketBase](https://pocketbase.io), as a Go module you add to your own PocketBase build.
 >
-> **Status: design phase.** There is no usable functionality yet, only test tooling. The documents in `docs/` describe what will be built. Feedback via issues is welcome.
+> **Status: early development, not released.** Registering a passkey as a signed-in user and logging in with it work and are tested; recovery codes, invitations and the TypeScript client are not built yet. The documents in `docs/` describe the full design. Feedback via issues is welcome.
 
 pb-passkeys is an independent, community project. It is **not affiliated with or endorsed by PocketBase** or its author.
 
