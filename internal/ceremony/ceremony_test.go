@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-webauthn/webauthn/protocol"
+
 	"github.com/MarioShatterhand/pb-passkeys/internal/ceremony"
 	"github.com/MarioShatterhand/pb-passkeys/internal/testauthn"
 )
@@ -716,5 +718,28 @@ func TestReason(t *testing.T) {
 	}
 	if got := ceremony.Reason(errors.New("plain")); got != "plain" {
 		t.Errorf("Reason(plain error) = %q", got)
+	}
+
+	// go-webauthn reports a challenge mismatch with both challenges in the
+	// developer info. They must not reach the log.
+	mismatch := protocol.ErrVerification.
+		WithDetails("Error validating challenge").
+		WithInfo("Expected b Value: \"expected-challenge-value\"\nReceived b: \"received-challenge-value\"\n")
+
+	got := ceremony.Reason(mismatch)
+	if strings.Contains(got, "expected-challenge-value") || strings.Contains(got, "received-challenge-value") {
+		t.Errorf("Reason leaks challenges: %q", got)
+	}
+	if !strings.Contains(got, "Error validating challenge") {
+		t.Errorf("Reason = %q, want it to keep the description", got)
+	}
+
+	// Other developer info is kept; it is what makes the log useful.
+	origin := protocol.ErrVerification.
+		WithDetails("Error validating origin").
+		WithInfo("Expected Values: [https://example.com], Received: https://evil.example")
+
+	if got := ceremony.Reason(origin); !strings.Contains(got, "https://evil.example") {
+		t.Errorf("Reason = %q, want it to keep the received origin", got)
 	}
 }

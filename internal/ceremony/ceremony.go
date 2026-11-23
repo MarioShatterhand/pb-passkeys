@@ -367,6 +367,12 @@ func Reason(err error) string {
 	if errors.As(err, &perr) {
 		parts := []string{perr.Type, perr.Details, perr.DevInfo}
 
+		// go-webauthn puts the expected and the received challenge into the
+		// developer info of a challenge mismatch. Challenges are never logged.
+		if strings.Contains(strings.ToLower(perr.Details), "challenge") || strings.Contains(strings.ToLower(perr.DevInfo), "challenge") {
+			parts = []string{perr.Type, perr.Details}
+		}
+
 		return strings.Join(slicesDeleteEmpty(parts), ": ")
 	}
 
