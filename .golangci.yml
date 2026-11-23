@@ -1,0 +1,24 @@
+# golangci-lint v2 configuration.
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - bodyclose  # HTTP response bodies are closed
+    - errorlint  # errors are compared with errors.Is / errors.As
+    - gosec      # common security mistakes
+    - misspell
+    - unconvert
+
+  settings:
+    gosec:
+      excludes:
+        # "Potential hardcoded credentials" fires on every identifier that
+        # contains the word "credential", which in a WebAuthn module is most
+        # of them. Real secrets are caught by gitleaks, before commit and in CI.
+        - G101
+
+formatters:
+  enable:
+    - gofmt

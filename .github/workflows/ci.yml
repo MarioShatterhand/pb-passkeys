@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Check that go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      GOLANGCI_LINT_VERSION: 2.15.0
+      GOLANGCI_LINT_SHA256: 9b7fe6a6bf6334b98decf8d86b11415ea7889afdabdd1959fdce23af2a9ebcea
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install golangci-lint
+        run: |
+          file="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz"
+          curl -fsSLO "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${file}"
+          echo "${GOLANGCI_LINT_SHA256}  ${file}" | sha256sum -c -
+          tar -xzf "${file}"
+          sudo install -m 755 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint" /usr/local/bin/golangci-lint
+
+      - name: Lint
+        run: golangci-lint run ./...
+
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+
+      - name: Check dependencies for known vulnerabilities
+        run: govulncheck ./...
