@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
@@ -46,8 +47,14 @@ func testConfig(collections ...string) Config {
 // serve triggers PocketBase's serve event the way apis.Serve does, without
 // opening a listener, and returns the error that would abort startup.
 func serve(app core.App) error {
+	router, err := apis.NewRouter(app)
+	if err != nil {
+		return err
+	}
+
 	event := new(core.ServeEvent)
 	event.App = app
+	event.Router = router
 
 	return app.OnServe().Trigger(event, func(e *core.ServeEvent) error { return e.Next() })
 }
@@ -148,7 +155,7 @@ func TestSuperusersCollectionRejected(t *testing.T) {
 		}
 
 		// The collection ID is a valid collection identifier, so the static check cannot catch it.
-		m := &Module{app: app, cfg: testConfig(superusers.Id).withDefaults()}
+		m := mustModule(t, app, testConfig(superusers.Id))
 
 		err = m.checkCollections(app)
 		if !errors.Is(err, ErrInvalidConfig) || !strings.Contains(err.Error(), "superusers collection") {
@@ -203,7 +210,7 @@ func TestStartupWarnings(t *testing.T) {
 	t.Run("rate limiting disabled", func(t *testing.T) {
 		app := newTestApp(t)
 		setRateLimits(t, app, false)
-		m := &Module{app: app, cfg: testConfig("members").withDefaults()}
+		m := mustModule(t, app, testConfig("members"))
 
 		if w := m.startupWarnings(app); !has(w, "rate limiting is disabled") {
 			t.Errorf("no warning about disabled rate limiting: %q", w)
@@ -213,7 +220,7 @@ func TestStartupWarnings(t *testing.T) {
 	t.Run("rate limiting enabled without a matching rule", func(t *testing.T) {
 		app := newTestApp(t)
 		setRateLimits(t, app, true, core.RateLimitRule{Label: "/api/collections/", MaxRequests: 10, Duration: 60})
-		m := &Module{app: app, cfg: testConfig("members").withDefaults()}
+		m := mustModule(t, app, testConfig("members"))
 
 		if w := m.startupWarnings(app); !has(w, "no PocketBase rate limit rule covers") {
 			t.Errorf("no warning about the missing rule: %q", w)
@@ -223,7 +230,7 @@ func TestStartupWarnings(t *testing.T) {
 	t.Run("rate limiting covers the prefix", func(t *testing.T) {
 		app := newTestApp(t)
 		setRateLimits(t, app, true, core.RateLimitRule{Label: "POST /api/passkeys/", MaxRequests: 10, Duration: 60})
-		m := &Module{app: app, cfg: testConfig("members").withDefaults()}
+		m := mustModule(t, app, testConfig("members"))
 
 		if w := m.startupWarnings(app); len(w) != 0 {
 			t.Errorf("unexpected warnings: %q", w)
@@ -244,7 +251,7 @@ func TestStartupWarnings(t *testing.T) {
 			t.Fatalf("enable MFA: %v", err)
 		}
 
-		m := &Module{app: app, cfg: testConfig("members").withDefaults()}
+		m := mustModule(t, app, testConfig("members"))
 
 		w := m.startupWarnings(app)
 		if len(w) != 1 || !has(w, `collection "members" has MFA enabled`) {
@@ -406,4 +413,16 @@ func TestStartupSchedulesChallengeCleanup(t *testing.T) {
 	if n != 0 {
 		t.Errorf("challenges after cleanup = %d, want 0", n)
 	}
+}
+
+// mustModule builds a Module without binding it to the app's serve event.
+func mustModule(t *testing.T, app core.App, cfg Config) *Module {
+	t.Helper()
+
+	m, err := newModule(app, cfg.withDefaults())
+	if err != nil {
+		t.Fatalf("newModule: %v", err)
+	}
+
+	return m
 }

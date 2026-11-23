@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 
+	"github.com/MarioShatterhand/pb-passkeys/internal/ceremony"
 	"github.com/MarioShatterhand/pb-passkeys/internal/store"
 )
 
@@ -19,8 +21,13 @@ const (
 // Module is the handle returned by [Register]. It gives access to the
 // effective configuration and, in later versions, to hooks and the Go API.
 type Module struct {
-	app core.App
-	cfg Config
+	app        core.App
+	cfg        Config
+	names      store.Names
+	ceremonies *ceremony.Service
+
+	onRegistrationOptions  *hook.Hook[*RegistrationOptionsEvent]
+	onCredentialRegistered *hook.Hook[*CredentialRegisteredEvent]
 }
 
 // Register validates cfg and attaches the module to app. Call it once, before
@@ -46,7 +53,10 @@ func Register(app core.App, cfg Config) (*Module, error) {
 		return nil, err
 	}
 
-	m := &Module{app: app, cfg: cfg}
+	m, err := newModule(app, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		// PocketBase has applied the application's migrations by now, so the
@@ -55,10 +65,7 @@ func Register(app core.App, cfg Config) (*Module, error) {
 			return err
 		}
 
-		names := store.Names{
-			Credentials: m.cfg.Collections.Credentials,
-			Challenges:  m.cfg.Collections.Challenges,
-		}
+		names := m.names
 
 		if err := store.Migrate(e.App, names); err != nil {
 			return fmt.Errorf("passkeys: %w", err)
@@ -81,10 +88,46 @@ func Register(app core.App, cfg Config) (*Module, error) {
 			e.App.Logger().Warn("passkeys: " + warning)
 		}
 
+		m.bindRoutes(e)
+
 		return e.Next()
 	})
 
 	return m, nil
+}
+
+// newModule builds a Module from a validated configuration with defaults applied.
+func newModule(app core.App, cfg Config) (*Module, error) {
+	userVerification := map[UserVerification]ceremony.UserVerification{
+		UVRequired:    ceremony.UVRequired,
+		UVPreferred:   ceremony.UVPreferred,
+		UVDiscouraged: ceremony.UVDiscouraged,
+	}[cfg.UserVerification]
+
+	ceremonies, err := ceremony.New(ceremony.Config{
+		RPID:             cfg.RPID,
+		RPDisplayName:    cfg.RPDisplayName,
+		RPOrigins:        cfg.RPOrigins,
+		UserVerification: userVerification,
+		Algorithms:       cfg.Algorithms,
+		Timeout:          cfg.Timeout,
+		ChallengeTTL:     cfg.ChallengeTTL,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+
+	return &Module{
+		app: app,
+		cfg: cfg,
+		names: store.Names{
+			Credentials: cfg.Collections.Credentials,
+			Challenges:  cfg.Collections.Challenges,
+		},
+		ceremonies:             ceremonies,
+		onRegistrationOptions:  &hook.Hook[*RegistrationOptionsEvent]{},
+		onCredentialRegistered: &hook.Hook[*CredentialRegisteredEvent]{},
+	}, nil
 }
 
 // MustRegister is like [Register] but panics if the configuration is invalid.

@@ -37,7 +37,7 @@ your main.go
         │              step-up tokens, recovery codes, enrollments)
         ├── ceremony   wraps go-webauthn: begin/finish registration and login   internal/ceremony
         ├── recovery   recovery codes, enrollment tokens, step-up tokens        internal/recovery
-        ├── routes     HTTP handlers bound in app.OnServe()                     internal/routes
+        ├── routes     HTTP handlers bound in app.OnServe()                     (root package)
         └── jobs       cron cleanup of expired rows                             internal/store
 
 client/  (npm package)  base64url <-> ArrayBuffer, calls routes via pb.send(), saves into pb.authStore

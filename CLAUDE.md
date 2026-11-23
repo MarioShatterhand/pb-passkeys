@@ -27,11 +27,10 @@ Read before changing anything substantial:
 ## Layout (planned)
 
 ```
-/                 Go module root (package passkeys: Register, Config validation, hooks)
+/                 Go module root (package passkeys: Register, Config validation, hooks, HTTP handlers)
 internal/ceremony go-webauthn wrapper
 internal/store    collections, migrations, queries, cleanup jobs
 internal/recovery recovery codes, enrollment tokens, step-up
-internal/routes   HTTP handlers
 internal/testauthn software authenticator for tests (ES256, "none" attestation)
 client/           TypeScript client (npm package), Vitest tests
 examples/minimal  example app, target of Playwright E2E

@@ -79,6 +79,11 @@ type Authenticator struct {
 	// Transports is reported in the registration response.
 	Transports []string
 
+	// NextCredentialID, if set, is used as the ID of the next credential
+	// instead of a random one, and then cleared. Use it to present a
+	// credential ID that is already registered elsewhere.
+	NextCredentialID []byte
+
 	credentials []*credential
 }
 
@@ -155,9 +160,14 @@ func (a *Authenticator) Create(opts CreateOptions) (*Response, error) {
 		return nil, fmt.Errorf("testauthn: generate key: %w", err)
 	}
 
-	id := make([]byte, 32)
-	if _, err := rand.Read(id); err != nil {
-		return nil, fmt.Errorf("testauthn: generate credential id: %w", err)
+	id := a.NextCredentialID
+	a.NextCredentialID = nil
+
+	if len(id) == 0 {
+		id = make([]byte, 32)
+		if _, err := rand.Read(id); err != nil {
+			return nil, fmt.Errorf("testauthn: generate credential id: %w", err)
+		}
 	}
 
 	cred := &credential{

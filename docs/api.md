@@ -83,6 +83,14 @@ A helper `passkeys.ConfigFromEnv(prefix string)` may be added for people who pre
 
 All bodies are JSON. WebAuthn binary fields use base64url (WebAuthn L3 JSON serialization). `{c}` is the auth collection name or ID.
 
+Request and response shapes of the ceremony routes:
+
+- `*/options` routes answer with the bare options object (`PublicKeyCredentialCreationOptions` or `PublicKeyCredentialRequestOptions` in JSON form), ready for `PublicKeyCredential.parseCreationOptionsFromJSON()` / `parseRequestOptionsFromJSON()`.
+- `*/verify` routes take `{ "credential": <PublicKeyCredential.toJSON()>, ... }`. The wrapper leaves room for the fields that travel with the response: `name` (an optional label, at most 64 characters) on registration, and tokens in later versions. The server finds the ceremony by the challenge inside the credential's client data, so there is no ceremony ID to pass around.
+- `register/verify` answers with the new record of `passkey_credentials`, as the collection API would return it.
+
+Status codes of the registration routes: 401 without a token, 403 for a token of another collection (including superusers), 404 for a collection that has no passkey routes, 429 when too many ceremonies are pending, and one generic 400 for every refused response.
+
 Secrets (enrollment tokens, binding secrets, step-up tokens, recovery codes) are only ever sent in JSON bodies, never in a path or query string, because URLs are written to PocketBase request logs and proxy access logs.
 
 | Method & path | Auth | Purpose |
@@ -140,11 +148,11 @@ passkeys.CredentialKind(credRecord)     // "synced" | "device" | "security_key" 
 
 ## 4. Hooks
 
-All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/hook`. Handlers must call `e.Next()`; returning an error aborts the operation and the client gets a generic error. PocketBase writes the error message and data of failed requests to its request log, so errors returned from hooks and handlers must never contain a secret.
+All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/hook`. Handlers must call `e.Next()`; returning an error aborts the operation and the client gets a generic error. A handler that wants the client to see a specific status and message returns a PocketBase API error (for example `e.ForbiddenError(...)`), which is passed through unchanged. Hooks that run inside a transaction carry the transaction as `e.App`; database work done through it is rolled back together with the operation. PocketBase writes the error message and data of failed requests to its request log, so errors returned from hooks and handlers must never contain a secret.
 
 | Hook | When | Typical use |
 |---|---|---|
-| `OnRegistrationOptions` | Before options are returned | Custom limits |
+| `OnRegistrationOptions` | Before options are returned; `e.UserName` and `e.UserDisplayName` can be changed | Custom limits, the label shown by the authenticator |
 | `OnCredentialRegistered` | After a credential is stored (in transaction) | Notify the user, audit log |
 | `OnBeforeLogin` | Assertion verified, before the token is issued | Block disabled accounts, geo rules |
 | `OnLoginFailed` | Any failed login verification | Alerting, fail2ban log line |
