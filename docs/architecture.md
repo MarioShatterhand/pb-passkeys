@@ -101,7 +101,7 @@ Server-side ceremony state:
 | `recordRef` | Set for registration and step-up; empty for discoverable login |
 | `enrollmentRef` | Set when registration was started with an enrollment token |
 | `sessionData` | json, hidden |
-| `expiresAt` | Default 5 min (`ChallengeTTL`); also written to go-webauthn's `SessionData.Expires`, which would otherwise follow the shorter browser `Timeout` |
+| `expiresAt` | Default 5 min (`ChallengeTTL`); also written to go-webauthn's `SessionData.Expires`, which go-webauthn itself leaves empty by default |
 
 A challenge is consumed atomically (read and delete in one transaction) on first use, success or failure; this includes a challenge presented to the wrong ceremony type or collection, or after it expired. Expired rows are removed by a cron job every 5 minutes. No API access. Because `login/options` is public, the number of unexpired challenges is capped (`Config.MaxPendingChallenges`); above the cap, new public ceremonies are refused with 429 until cleanup or expiry frees space.
 
