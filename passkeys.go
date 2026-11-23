@@ -31,6 +31,7 @@ type Module struct {
 	onBeforeLogin          *hook.Hook[*BeforeLoginEvent]
 	onLoginFailed          *hook.Hook[*LoginFailedEvent]
 	onSignCountAnomaly     *hook.Hook[*SignCountAnomalyEvent]
+	onCredentialDeleted    *hook.Hook[*CredentialDeletedEvent]
 }
 
 // Register validates cfg and attaches the module to app. Call it once, before
@@ -60,6 +61,8 @@ func Register(app core.App, cfg Config) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	m.bindCredentialHooks()
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		// PocketBase has applied the application's migrations by now, so the
@@ -133,6 +136,7 @@ func newModule(app core.App, cfg Config) (*Module, error) {
 		onBeforeLogin:          &hook.Hook[*BeforeLoginEvent]{},
 		onLoginFailed:          &hook.Hook[*LoginFailedEvent]{},
 		onSignCountAnomaly:     &hook.Hook[*SignCountAnomalyEvent]{},
+		onCredentialDeleted:    &hook.Hook[*CredentialDeletedEvent]{},
 	}, nil
 }
 

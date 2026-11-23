@@ -111,6 +111,13 @@ Secrets (enrollment tokens, binding secrets, step-up tokens, recovery codes) are
 
 Listing and renaming credentials use the normal collection API on `passkey_credentials` (`pb.collection("passkey_credentials").getFullList()`), governed by the default rules in architecture.md. Deleting does too, unless `StepUp.ForCredentialDelete` is on, in which case the collection delete rule is `null` and `credentials/delete` is the only way.
 
+Two rules apply to these collection API calls beyond the API rules:
+
+- An update may contain only `name`. A request that names any other field is refused with 403, even a hidden field that PocketBase would silently drop.
+- Deleting a user's last passkey is refused with 400 unless `AllowDeleteLastCredential` is set. Superusers are exempt from both rules.
+
+When a user record is deleted, its passkeys are deleted with it in the same transaction.
+
 ### Error responses
 
 Errors use PocketBase's standard error shape (`{ status, message, data }`). Public endpoints return **the same generic 400** for "no such user", "wrong code", "unknown credential" and "verification failed", so they cannot be used to enumerate accounts. Detailed reasons go only to the server log at debug level and to hooks.
@@ -143,9 +150,9 @@ tok, err := pk.IssueEnrollment(ctx, passkeys.EnrollmentRequest{
 
 pk.RevokeEnrollment(ctx, id)
 pk.RevokeAllCredentials(ctx, userRecord)   // also deletes codes, rotates tokenKey
-pk.ListCredentials(ctx, userRecord)
+pk.ListCredentials(userRecord)             // records of passkey_credentials, oldest first
 
-passkeys.CredentialKind(credRecord)     // "synced" | "device" | "security_key" | "unknown"; display only
+passkeys.CredentialKind(credRecord)        // KindSynced | KindDevice | KindSecurityKey | KindUnknown; display only
 ```
 
 ## 4. Hooks
@@ -159,7 +166,7 @@ All hooks are `*hook.Hook[*Event]` from `github.com/pocketbase/pocketbase/tools/
 | `OnBeforeLogin` | Assertion verified and the credential's counter saved, before the token is issued | Block disabled accounts, geo rules |
 | `OnLoginFailed` | Any failed login; `e.Reason` says why, `e.Record` is set when the user is known | Alerting, fail2ban log line |
 | `OnSignCountAnomaly` | Sign counter did not increase for a credential that reports one; fires under `Warn` and `Reject`, with `e.Rejected` telling which | Alert, flag the credential for review |
-| `OnCredentialDeleted` | After delete through the API or Go | Notify the user |
+| `OnCredentialDeleted` | After a passkey was deleted through the collection API (in transaction); not for passkeys removed together with their user record | Notify the user |
 | `OnRecoveryCodesGenerated` | After a new set is created | Notify the user |
 | `OnRecoveryCodeRedeemed` | After a code is used | Notify the user, alert when few remain |
 | `OnEnrollmentVerify` | Before an enrollment token is accepted; `e.Extra` holds client data | Check a phone code from `e.Enrollment.Meta` |

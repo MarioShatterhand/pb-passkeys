@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - `passkeys.Register` and `MustRegister` with `Config`: defaults, validation of the relying party settings and options, and startup checks of the configured auth collections. The module does not serve any route yet.
 - The module creates its collections `passkey_credentials` and `passkey_challenges` on the first start, with API rules that let users list, rename and delete only their own passkeys. Startup fails when the collection names in the configuration were changed afterwards.
 - Storage for ceremony challenges: single use with atomic consumption, bound to ceremony type and collection, a cap on pending challenges, and a cleanup job for expired ones.
+- Managing passkeys through the collection API: only the name can be changed, the last passkey cannot be deleted unless `AllowDeleteLastCredential` is set, and the `OnCredentialDeleted` hook fires on deletion. A user's passkeys are deleted together with the user record.
+- `passkeys.CredentialKind` (`synced`, `device`, `security_key`, `unknown`) and `Module.ListCredentials`.
 - Routes `POST {prefix}/{collection}/login/options` and `login/verify`: login with a discoverable passkey, answered with the standard PocketBase auth response. Hooks `OnBeforeLogin`, `OnLoginFailed` and `OnSignCountAnomaly`; `SignCountPolicy` is applied.
 - Routes `POST {prefix}/{collection}/register/options` and `register/verify`: a signed-in user can add a passkey. Hooks `OnRegistrationOptions` and `OnCredentialRegistered`.
 - `internal/ceremony`: registration and discoverable login ceremonies on top of go-webauthn, with the configured user verification policy, algorithms and challenge lifetime.

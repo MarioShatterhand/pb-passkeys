@@ -2,7 +2,6 @@ package passkeys
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/router"
@@ -31,17 +30,11 @@ func (m *Module) routeCollection(e *core.RequestEvent) (*core.Collection, error)
 	notFound := e.NotFoundError("", nil)
 
 	collection, err := e.App.FindCachedCollectionByNameOrId(e.Request.PathValue(collectionParam))
-	if err != nil || !collection.IsAuth() || collection.Name == core.CollectionNameSuperusers {
+	if err != nil || !m.isPasskeyCollection(collection) {
 		return nil, notFound
 	}
 
-	for _, name := range m.cfg.AuthCollections {
-		if strings.EqualFold(name, collection.Name) || name == collection.Id {
-			return collection, nil
-		}
-	}
-
-	return nil, notFound
+	return collection, nil
 }
 
 // routeUser returns the signed-in record, which must belong to the collection

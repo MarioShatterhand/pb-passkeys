@@ -76,3 +76,24 @@ func CountCredentials(app core.App, names Names, collectionRef, recordRef string
 func ownerExp(collectionRef, recordRef string) dbx.Expression {
 	return dbx.HashExp{FieldCollectionRef: collectionRef, FieldRecordRef: recordRef}
 }
+
+// DeleteCredentialsOf removes every credential of one user and returns how
+// many were removed.
+func DeleteCredentialsOf(app core.App, names Names, collectionRef, recordRef string) (int, error) {
+	records, err := ListCredentials(app, names, collectionRef, recordRef)
+	if err != nil {
+		return 0, err
+	}
+
+	deleted := 0
+
+	for _, record := range records {
+		if err := app.Delete(record); err != nil {
+			return deleted, fmt.Errorf("store: delete credential: %w", err)
+		}
+
+		deleted++
+	}
+
+	return deleted, nil
+}

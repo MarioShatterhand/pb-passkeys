@@ -128,3 +128,29 @@ func (m *Module) OnLoginFailed() *hook.Hook[*LoginFailedEvent] {
 func (m *Module) OnSignCountAnomaly() *hook.Hook[*SignCountAnomalyEvent] {
 	return m.onSignCountAnomaly
 }
+
+// CredentialDeletedEvent is passed to the [Module.OnCredentialDeleted] hook.
+type CredentialDeletedEvent struct {
+	hook.Event
+
+	// App is the transaction the credential was deleted in.
+	App core.App
+
+	// Request is the HTTP request that deleted the credential.
+	Request *core.RequestEvent
+
+	// Record is the user who owned the passkey. It is nil if that record no
+	// longer exists.
+	Record *core.Record
+
+	// Credential is the deleted record of the credentials collection.
+	Credential *core.Record
+}
+
+// OnCredentialDeleted fires after a passkey was deleted through the
+// collection API, inside the same database transaction. Returning an error
+// instead of calling e.Next() rolls the deletion back. It does not fire for
+// passkeys that are removed together with their user record.
+func (m *Module) OnCredentialDeleted() *hook.Hook[*CredentialDeletedEvent] {
+	return m.onCredentialDeleted
+}
