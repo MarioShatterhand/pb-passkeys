@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -50,7 +51,7 @@ func credentialFromRecord(record *core.Record) (ceremony.Credential, error) {
 	return ceremony.Credential{
 		ID:                id,
 		PublicKey:         publicKey,
-		SignCount:         uint32(max(record.GetInt64(store.FieldSignCount), 0)),
+		SignCount:         signCountFromInt(record.GetInt64(store.FieldSignCount)),
 		AAGUID:            parseAAGUID(record.GetString(store.FieldAAGUID)),
 		Transports:        transports,
 		Attachment:        record.GetString(store.FieldAuthenticatorAttachment),
@@ -74,6 +75,20 @@ func credentialsFromRecords(records []*core.Record) ([]ceremony.Credential, erro
 	}
 
 	return out, nil
+}
+
+// signCountFromInt converts a stored counter to the 32-bit value WebAuthn
+// uses. The field only ever holds values written from a uint32; anything
+// outside that range is clamped rather than wrapped.
+func signCountFromInt(n int64) uint32 {
+	switch {
+	case n < 0:
+		return 0
+	case n > math.MaxUint32:
+		return math.MaxUint32
+	default:
+		return uint32(n)
+	}
 }
 
 func encodeBytes(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }

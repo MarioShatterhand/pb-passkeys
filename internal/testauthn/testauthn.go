@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
@@ -170,6 +171,11 @@ func (a *Authenticator) Create(opts CreateOptions) (*Response, error) {
 		}
 	}
 
+	// The credential ID length is a 16-bit field of the authenticator data.
+	if len(id) > math.MaxUint16 {
+		return nil, errors.New("testauthn: credential id is too long")
+	}
+
 	cred := &credential{
 		id:         id,
 		rpID:       opts.RPID,
@@ -185,7 +191,7 @@ func (a *Authenticator) Create(opts CreateOptions) (*Response, error) {
 	// Attested credential data: AAGUID, credential ID length, credential ID, public key.
 	authData := a.authenticatorData(opts.RPID, flagAttestedData, cred.nextSignCount(a.ZeroSignCount))
 	authData = append(authData, a.AAGUID[:]...)
-	authData = binary.BigEndian.AppendUint16(authData, uint16(len(id)))
+	authData = binary.BigEndian.AppendUint16(authData, uint16(len(id))) //nolint:gosec // the length is checked above
 	authData = append(authData, id...)
 	authData = append(authData, coseKey...)
 

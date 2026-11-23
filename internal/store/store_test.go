@@ -323,10 +323,10 @@ func TestCredentialsAPIRules(t *testing.T) {
 
 	// setup builds a fresh app with two members who own one credential each.
 	type fixture struct {
-		app                    *tests.TestApp
-		alice, bob             *core.Record
-		aliceCred, bobCred     *core.Record
-		aliceToken, guestToken string
+		app                *tests.TestApp
+		alice, bob         *core.Record
+		aliceCred, bobCred *core.Record
+		aliceToken         string
 	}
 
 	setup := func(t *testing.T) fixture {

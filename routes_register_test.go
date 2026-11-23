@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -739,6 +740,20 @@ func TestCredentialRegisteredHook(t *testing.T) {
 			t.Errorf("credentials = %d, want the registration rolled back", n)
 		}
 	})
+}
+
+func TestSignCountFromInt(t *testing.T) {
+	for in, want := range map[int64]uint32{
+		-1:             0,
+		0:              0,
+		7:              7,
+		math.MaxUint32: math.MaxUint32,
+		1 << 40:        math.MaxUint32,
+	} {
+		if got := signCountFromInt(in); got != want {
+			t.Errorf("signCountFromInt(%d) = %d, want %d", in, got, want)
+		}
+	}
 }
 
 func TestAAGUIDFormatting(t *testing.T) {
